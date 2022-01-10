@@ -32,6 +32,8 @@ test_files = {'smoking': '/2006_smoking_status',
 # checkpoint = "emilyalsentzer/Bio_ClinicalBERT"
 checkpoint = "./models/pretrained_tokenizer/clinicalBERT"
 
+# Loss function
+
 # Needleman-Wunsch alignment weights
 match = 2
 mismatch = -10
