@@ -3,7 +3,7 @@
 #BSUB -P acc_psychgen
 #BSUB -q gpu
 #BSUB -n 8
-#BSUB -W 60:00
+#BSUB -W 20:00
 #BSUB -R v100
 #BSUB -R rusage[ngpus_excl_p=4]
 #BSUB -o %J.stdout
@@ -14,7 +14,7 @@ CONDA_ENV=/sc/arion/work/landii03/conda/envs/redundancy/bin/python3
 DATA_PATH=./datasets/n2c2_datasets/n2c2datasets_forClinicalBERTfinetuning.pkl
 CHECKPOINT=./models/pretrained_model/clinicalBERT/
 
-EPOCHS=1
+EPOCHS=10
 BATCH_SIZE=32
 
 $CONDA_ENV -m fine_tune_bert \

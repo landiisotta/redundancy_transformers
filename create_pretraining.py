@@ -309,7 +309,7 @@ def write_instance_to_example(instances, tokenizer, max_seq_length,
         masked_lm_weights = [1.0] * len(masked_lm_ids)
 
         # Add mask to last position to compute PPL
-        if len(masked_lm_positions) < max_predictions_per_seq:
+        if len(masked_lm_positions) <= max_predictions_per_seq:
             masked_lm_positions.append(ppl_idx)
             masked_lm_ids.append(input_ids[ppl_idx])
             masked_lm_weights.append(1.0)

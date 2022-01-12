@@ -6,3 +6,4 @@ torch==1.10.0
 datasets==1.16.1
 pytest==6.2.5
 tqdm==4.62.3
+numpy

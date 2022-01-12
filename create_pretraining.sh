@@ -13,7 +13,7 @@
 DATA_DIR=n2c2_datasets #modify this to be the path to the tokenized data
 OUTPUT_FILE=n2c2datasets_forClinicalBERTfinetuning.pkl
 
-CONDA_ENV=/sc/arion/work/landii03/conda/envs/redundancy/bin/python3
+CONDA_ENV=~/opt/anaconda3/envs/redundancy/bin/python3
 
 # Note that create_pretraining_data.py is unmodified from the script in the original BERT repo.
 # Refer to the BERT repo for the most up to date version of this code.

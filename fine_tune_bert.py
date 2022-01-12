@@ -45,7 +45,7 @@ def run_finetuning(checkpoint,
                                 'labels'])
         val_loader = DataLoader(val,
                                 batch_size=batch_size,
-                                shuffle=True)
+                                shuffle=False)
     else:
         val_loader = None
 
@@ -57,7 +57,6 @@ def run_finetuning(checkpoint,
                       eps=1e-6,
                       weight_decay=0.01,
                       correct_bias=False)
-    # scheduler = torch.optim.lr_scheduler.LinearLR(optimizer=optimizer)
     scheduler = get_polynomial_decay_schedule_with_warmup(optimizer=optimizer,
                                                           num_warmup_steps=num_warmup_steps,
                                                           num_training_steps=num_training_steps,

@@ -33,7 +33,8 @@ sh note_tokenization.sh >> out_log.log
 
 ## Dataset loading
 
-The script `datasets/n2c2_datasets/n2c2_datasets.py` organizes notes in a `DatasetDict` object, with keys "train|test" and values `Dataset` 
+The script `datasets/n2c2_datasets/n2c2_datasets.py` organizes notes in a `DatasetDict` object, with keys "train|test" 
+and values `Dataset` 
 objects with features "sentence", "document", "challenge". The script was tested running the following command in the 
 project folder (root of the `datasets` folder):
 
@@ -69,6 +70,7 @@ RUN_SLOW=1 pytest tests/test_dataset_common.py::LocalDatasetTest::test_load_data
 to test both real and dummy datasets.
 
 A cached version of the data will be stored at `~/.cache/huggingface/datasets/n2c2_dataset/default/0.0.1`.  
+
 
 ## Create pretraining data for MLM and NSP with ClinicalBERT
 
