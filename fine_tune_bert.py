@@ -1,4 +1,5 @@
 import torch
+import torch.nn as nn
 from train import train_and_eval
 from transformers import BertForPreTraining
 from transformers.optimization import get_polynomial_decay_schedule_with_warmup, AdamW
@@ -8,6 +9,7 @@ import argparse
 import sys
 import time
 
+# Run on GPU if available
 DEVICE = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
 
 
@@ -18,7 +20,20 @@ def run_finetuning(checkpoint,
                    learning_rate,
                    num_warmup_steps,
                    num_training_steps,
+                   patience,
                    dev=True):
+    """
+    Fine-tune ClinicalBERT on MLM and NSP tasks.
+    :param checkpoint: ClinicalBERT checkpoint
+    :param data_path: path to pkl DatasetDict
+    :param batch_size: Batch size
+    :param n_epochs: Number of training epochs
+    :param learning_rate: Learning rate
+    :param num_warmup_steps: Number of steps for lr decay warmup
+    :param num_training_steps: Total number of training samples to process
+    :param patience: (Number of epochs - 1) before stopping
+    :param dev: Whether to perform validation on dev dataset
+    """
     torch.manual_seed(42)
     torch.cuda.manual_seed(42)
 
@@ -48,13 +63,17 @@ def run_finetuning(checkpoint,
                                 shuffle=False)
     else:
         val_loader = None
-
+    # Load pretrained model
     model = BertForPreTraining.from_pretrained(checkpoint)
+    # Run on multiple GPUs if available
+    if torch.cuda.device_count() > 1:
+        print("Using", torch.cuda.device_count(), "GPUs")
+        model = nn.DataParallel(model)
     model.to(DEVICE)
     optimizer = AdamW(model.parameters(),
                       lr=learning_rate,
                       betas=(0.9, 0.999),
-                      eps=1e-6,
+                      eps=1e-8,
                       weight_decay=0.01,
                       correct_bias=False)
     scheduler = get_polynomial_decay_schedule_with_warmup(optimizer=optimizer,
@@ -63,14 +82,14 @@ def run_finetuning(checkpoint,
                                                           lr_end=0.0,
                                                           power=1.0,
                                                           last_epoch=-1)
-
-    train_and_eval(train_loader,
-                   val_loader,
-                   model,
+    train_and_eval(train_dataloader=train_loader,
+                   dev_dataloader=val_loader,
+                   model=model,
                    n_epochs=n_epochs,
                    vocab_size=tkn_train.vocab_size,
                    optimizer=optimizer,
-                   scheduler=scheduler)
+                   scheduler=scheduler,
+                   patience=patience)
 
 
 if __name__ == '__main__':
@@ -104,6 +123,10 @@ if __name__ == '__main__':
                         type=int,
                         dest='num_training_steps',
                         help='Total number of training steps')
+    parser.add_argument('--patience',
+                        type=int,
+                        dest='patience',
+                        help='Number of epochs before early stopping.')
     parser.add_argument('--dev', dest='dev_set', action='store_true')
     parser.add_argument('--no-dev', dest='dev_set', action='store_false')
 
@@ -116,5 +139,6 @@ if __name__ == '__main__':
                    learning_rate=config.learning_rate,
                    num_training_steps=config.num_training_steps,
                    num_warmup_steps=config.num_warmup_steps,
+                   patience=config.patience,
                    dev=config.dev_set)
     print(f"Process finished in {time.time() - start}")

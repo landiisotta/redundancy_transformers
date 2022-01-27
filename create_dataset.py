@@ -1,4 +1,4 @@
-import xml.etree.ElementTree as ET
+import xml.etree.ElementTree as ElT
 import os
 import csv
 import re
@@ -10,25 +10,27 @@ import time
 
 def read_txt(file):
     """
-    Txt file reader (first line corresponds to the record number if any)
+    Txt file format reader (first line corresponds to the record number if any)
     :param file: file name
     :return: note
+    :rtype: str
     """
-    f = open(file, mode='r', encoding='utf-8-sig')
-    text = f.read()
+    with open(file, mode='r', encoding='utf-8-sig') as f:
+        text = f.read().rstrip()
     return text
 
 
-def readXML(file):
+def readxml(file):
     """
-    XML reader.
+    XML file format reader.
     :param file: file name
     :return: note
+    :rtype: str
     """
 
     notes = []
 
-    tree = ET.parse(file)
+    tree = ElT.parse(file)
     root = tree.getroot()
     n_id, text = None, None
     for elem in root.iter():
@@ -51,13 +53,15 @@ def create_dt(challenge, data_folder, train=True):
     Create challenge datasets. Read notes from files from
     different challenges. Files with notes were downloaded from
     https://portal.dbmi.hms.harvard.edu/projects/n2c2-nlp/
-    preserving all sub_folder/file names. Challenge abbreviations and
-    main folders are reported in utils.
-    :param challenge: challenge name
+    preserving all sub_folder/file names. Challenge folders organization is reported in utils.
+    :param challenge: challenge name (see utils.py)
+    :param data_folder: path to the datasets folder
     :param train: bool, if True function returns the training set,
-        test set otherwise
-    :return: tuple with train and test dict
+        test set otherwise (default True)
+    :return: all notes combined (w/o duplicates)
+    :rtype: dict
     """
+    # Create file paths
     if train:
         file_path = ut.train_files[challenge]
     else:
@@ -66,6 +70,7 @@ def create_dt(challenge, data_folder, train=True):
         file_path = [data_folder + file_path]
     else:
         file_path = [data_folder + ff for ff in file_path]
+
     files = []
     myparser = {}
     for fld in file_path:
@@ -80,6 +85,7 @@ def create_dt(challenge, data_folder, train=True):
                               if re.search(r'records_test|test_all_groundtruth', ff)])
         else:
             files.extend([os.path.join(fld, ff) for ff in os.listdir(fld) if not re.match(r'^\.', ff)])
+    # Extract note IDs
     if challenge in ['med_extraction', 'temp_rel', 'med_extraction_tsk2']:
         for ff in files:
             text = read_txt(ff)
@@ -101,12 +107,12 @@ def create_dt(challenge, data_folder, train=True):
             myparser[idx] = text
     elif challenge in ['smoking', 'obesity']:
         for ff in files:
-            out = readXML(ff)
+            out = readxml(ff)
             myparser = {elem[0]: elem[1] for elem in out}
             return myparser
     else:
         for ff in files:
-            text = readXML(ff)[0][1]
+            text = readxml(ff)[0][1]
             idxa = re.search('[0-9]+-[0-9]+', ff.split('/')[-1]).group(0)
             idx = idxa.split('-')[0]
             n = idxa.split('-')[1]
@@ -116,7 +122,7 @@ def create_dt(challenge, data_folder, train=True):
 
 
 """
-Private function
+Private functions
 """
 
 
@@ -127,6 +133,7 @@ def _merge_dict(dict_list):
     to keep track of the notes for downstream tasks.
     :param dict_list: list of tuples (challenge id, dictionary with notes)
     :return: (new dictionary, new_key to old_key dictionary)
+    :rtype: tuple
     """
     dt = {}
     newk_to_oldk = {}
@@ -144,11 +151,17 @@ def _merge_dict(dict_list):
 
 
 def _write_key_dict(name, k_dict, output_folder):
+    """
+    Write new_to_old_key dictionary to file.
+    :param name: output file name
+    :param k_dict: dictionary with link between new note ids and old note ids per challenge
+    :param output_folder:
+    """
     with open(os.path.join(output_folder, f'{name}.csv'), 'w') as f:
         wr = csv.writer(f)
         # NOTE_ID: new ID from merge;
         # CH_ID: challenge old ID;
-        # CH_NAME: challenge old name.
+        # CH_NAME: challenge name.
         wr.writerow(["NOTE_ID", "CH_ID", "CH_NAME"])
         for k, tup in k_dict.items():
             wr.writerow([k, tup[0], tup[1]])
@@ -163,7 +176,6 @@ def _write_file(dataset, file_name, output_folder, train=True):
     :type file_name: str
     :param train: whether to save the train or test sets
     :type train: bool
-    :return: None
     """
     partition = 'train'
     if not train:
@@ -174,10 +186,11 @@ def _write_file(dataset, file_name, output_folder, train=True):
             wr.writerow([nid, text])
 
 
+# Main
 if __name__ == '__main__':
     start = time.process_time()
-    print("Creating N2C2 dataset:")
-    parser = argparse.ArgumentParser(description='Create notes dataset (train/test) from n2c2 challenges.')
+    print("Creating N2C2 merged dataset:")
+    parser = argparse.ArgumentParser(description='Create unique dataset (train/test) from n2c2 challenges.')
     parser.add_argument('-i',
                         '--input',
                         type=str,

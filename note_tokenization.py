@@ -10,9 +10,17 @@ import os
 import time
 
 
-# BERT uncased, so the text is not lower cased
+# We are gonna be using BERT uncased, so the text is not lower cased
+# Custom sentence tokenizer for clinical notes
 @Language.component("custom_sentencizer")
 def custom_sentencizer(doc):
+    """
+    Custom sentencizer.
+    :param doc: Document
+    :type doc: spacy.tokens.doc.Doc
+    :return: tokenized document
+    :rtype: spacy.tokens.doc.Doc
+    """
     for i, token in enumerate(doc[:-1]):
         # Full stop for sentence tokenization
         if re.match(r'^ ?\.', token.text) and (doc[i + 1].is_upper or doc[i + 1].is_title):
@@ -39,6 +47,13 @@ def custom_sentencizer(doc):
 
 @Language.component('tkndef')
 def def_tokens(doc):
+    """
+    Custom tokenizer for special tokens, e.g., abbreviations
+    :param doc: document
+    :type doc: spacy.tokens.doc.Doc
+    :return: tokenized document
+    :rtype: spacy.tokens.doc.Doc
+    """
     patterns = [r'\[\*\*.+?\*\*\]',  # de-identification
                 r'[0-9]{1,4}[/\-][0-9]{1,2}[/\-][0-9]{1,4}',  # date
                 r'[0-9]+\-?[0-9]+%?',  # lab/test result
@@ -64,6 +79,7 @@ def def_tokens(doc):
     return doc
 
 
+# Main
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description="Tokenize notes.")
     parser.add_argument('-i',
@@ -103,6 +119,7 @@ if __name__ == '__main__':
     nlp.add_pipe('custom_sentencizer', before='parser')
     Token.set_extension('is_list', default=False)
 
+    # Read note IDs
     with open(os.path.join(config.output_folder, config.file_keys), 'r') as f:
         rd = csv.reader(f)
         next(rd)

@@ -1,6 +1,0 @@
-dataset:
-    config_name: language_model
-bert_model:
-    seed: 1234
-    epochs: 10
-    batch_size: 32

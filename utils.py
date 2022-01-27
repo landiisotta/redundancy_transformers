@@ -1,12 +1,11 @@
-# n2c2 challenge datasets abbreviations
+# n2c2 challenge datasets folder names
 chll = ['smoking', 'obesity',
         'med_extraction', 'cpt_extraction',
         'temp_rel', 'long',
         'med_extraction_tsk2']
 
-# Folders where files are stores. Subfolder and file names were preserved.
-# Main folder names were changed respect to those downloaded from
-# https://portal.dbmi.hms.harvard.edu/projects/n2c2-nlp/
+# Folders where files are stores. Sub folder and file names were preserved.
+# Main folder names were changed
 train_files = {'smoking': '/2006_smoking_status',
                'obesity': '/2008_obesity',
                'med_extraction': ['/'.join(['/2009_medication/training.sets.released',
@@ -29,18 +28,4 @@ test_files = {'smoking': '/2006_smoking_status',
               'med_extraction_tsk2': '/2018_medication_extraction/test'}
 
 # Pre-trained checkpoint
-# checkpoint = "emilyalsentzer/Bio_ClinicalBERT"
 checkpoint = "./models/pretrained_tokenizer/clinicalBERT"
-
-# Loss function
-
-# Needleman-Wunsch alignment weights
-match = 2
-mismatch = -10
-gap_open = -0.5
-gap_extend = -0.1
-
-# Minimum tokens in sentence
-min_sen_len = 1
-# Minimum sentence counts for BP redundancy
-min_sen_count = 5

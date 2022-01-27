@@ -3,10 +3,12 @@ from tqdm.auto import tqdm
 import metrics
 
 DEVICE = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
+GPUS = torch.cuda.device_count()
 PROGRESS_BAR = tqdm()
 
 
 def test(test_dataloader, model, vocab_size):
+    """Evaluation step"""
     PROGRESS_BAR.total = len(test_dataloader)
 
     model.eval()
@@ -25,18 +27,19 @@ def test(test_dataloader, model, vocab_size):
                                            nsp_logits=outputs.seq_relationship_logits,
                                            mlm_labels=batch['labels'],
                                            lm_labels=lm_labels,
-                                           nsp_labels=batch['next_sentence_labels'],
+                                           nsp_labels=batch['next_sentence_label'],
                                            vocab_size=vocab_size,
                                            dev=True)
         PROGRESS_BAR.update(1)
 
         eval_metrics.add_batch()
-        loss += outputs.loss.item()
+        loss += outputs.loss.sum().item() * batch['input_ids'].shape[0]
 
-    return eval_metrics.compute(), loss / len(test_dataloader)
+    return eval_metrics.compute(), loss / (len(test_dataloader.sampler) * GPUS)
 
 
 def create_lm_labels(batch):
+    """Create labels for language model, i.e., predict only last token before EOS [SEP]"""
     batch_size, seq_length = batch.shape
     lm_labels = []
     for idx in range(batch_size):

@@ -337,7 +337,7 @@ def write_instance_to_example(instances, tokenizer, max_seq_length,
 
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description="Create Dataset for LM fine-tuning.")
+    parser = argparse.ArgumentParser(description="Create Dataset for model fine-tuning.")
     parser.add_argument('-dt',
                         '--dataset_name',
                         type=str,

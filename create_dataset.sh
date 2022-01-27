@@ -10,18 +10,23 @@
 #BSUB -eo %J.stderr
 #BSUB -L /bin/bash
 
+ml purge
+unset PYTHONPATH
+ml anaconda3/2021.5
+conda activate /sc/arion/work/landii03/conda/envs/redundancy
+unset PYTHONPATH
+
 # This file name will be used to create two txt files, i.e.,
-# train_FILENAME.txt and test_FILENAME.txt with ID, note_text
+# train_FILENAME.txt and test_FILENAME.txt with columns NOTE_ID, NOTE_TEXT
 FILENAME=n2c2_datasets
 
 DATA_DIR=./datasets
 OUTPUT_DIR=$DATA_DIR/$FILENAME
-CONDA_ENV=/sc/arion/work/landii03/conda/envs/redundancy/bin/python3
 
-# The create dataset module also saves the dictionaries
+# The module also creates
 # train_newk_to_oldk.csv and test_newk_to_oldk.csv
 # with NOTE_ID, CH_ID (challenge id), CH_NAME (challenge name) as columns
-$CONDA_ENV -m create_dataset \
+python -m create_dataset \
   --input=$DATA_DIR \
   --output=$OUTPUT_DIR \
   --outputfile=$FILENAME
