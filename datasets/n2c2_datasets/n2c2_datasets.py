@@ -1,0 +1,114 @@
+# coding=utf-8
+# Copyright 2020 The HuggingFace Datasets Authors and the current dataset script contributor.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+"""TODO: Add a description here."""
+
+import csv
+import os
+
+import datasets
+
+# Dataset description
+_DESCRIPTION = """\
+n2c2 datasets from different challenges for clinical notes redundancy investigation.
+"""
+
+# Link to the official homepage
+_HOMEPAGE = "https://portal.dbmi.hms.harvard.edu/projects/n2c2-nlp/"
+
+# Uncomment the following line to load the dummy version of the data (e.g., for code debugging)
+# _FOLDER = {'language_model': './datasets/n2c2_datasets/dummy/language_model/0.0.1/dummy_data'}
+_FOLDER = {'language_model': './datasets/n2c2_datasets'}
+
+
+class N2c2Dataset(datasets.GeneratorBasedBuilder):
+    """TODO: Short description of my dataset."""
+
+    VERSION = datasets.Version("0.0.1")
+    BUILDER_CONFIGS = [datasets.BuilderConfig(name='language_model', version=VERSION,
+                                              description="Language model fine-tuning dataset")]
+    DEFAULT_CONFIG_NAME = 'language_model'
+
+    def _info(self):
+        if self.config.name == 'language_model':
+            # TODO: This method specifies the datasets.DatasetInfo object which contains informations and typings for the dataset
+            features = datasets.Features(
+                {
+                    "sentence": datasets.Value("string"),
+                    "document": datasets.Value("string"),
+                    "challenge": datasets.Value("string")
+                    # These are the features of your dataset like images, labels ...
+                }
+            )
+        else:
+            features = datasets.Features = {}
+            pass
+        return datasets.DatasetInfo(
+            # This is the description that will appear on the datasets page.
+            description=_DESCRIPTION,
+            # This defines the different columns of the dataset and their types
+            features=features,  # Here we define them above because they are different between the two configurations
+            # If there's a common (input, target) tuple from the features,
+            # specify them here. They'll be used if as_supervised=True in
+            # builder.as_dataset.
+            supervised_keys=None,
+            # Homepage of the dataset for documentation
+            homepage=_HOMEPAGE,
+        )
+
+    def _split_generators(self, dl_manager):
+        """Returns SplitGenerators."""
+        # TODO: This method is tasked with downloading/extracting the data and defining the splits depending on the configuration
+        data_dir = _FOLDER[self.config.name]
+        # data_dir = dl_manager.download_and_extract(_FOLDER[self.config.name])
+        # data_dir = dl_manager.download_and_extract(my_files)
+        return [
+            datasets.SplitGenerator(
+                name=datasets.Split.TRAIN,
+                # These kwargs will be passed to _generate_examples
+                gen_kwargs={
+                    "filepath": os.path.join(data_dir, 'train_sentences.txt'),
+                    "split": "train",
+                },
+            ),
+            datasets.SplitGenerator(
+                name=datasets.Split.TEST,
+                # These kwargs will be passed to _generate_examples
+                gen_kwargs={
+                    "filepath": os.path.join(data_dir, 'test_sentences.txt'),
+                    "split": "test"
+                },
+            )
+        ]
+
+    def _generate_examples(
+            self, filepath, split  # method parameters are unpacked from `gen_kwargs` as given in `_split_generators`
+    ):
+        """ Yields examples as (key, example) tuples. """
+        # This method handles input defined in _split_generators to yield (key, example) tuples from the dataset.
+        # The `key` is here for legacy reason (tfds) and is not important in itself.
+        with open(filepath, 'r', encoding="utf-8") as f:
+            rd = csv.reader(f)
+            for id_, row in enumerate(rd):
+                if self.config.name == 'language_model':
+                    if len(row) > 0:
+                        yield id_, {
+                            "sentence": row[-1],
+                            "document": str(row[0]),
+                            "challenge": str(row[1]),
+                        }
+                    else:
+                        continue
+                else:
+                    pass
