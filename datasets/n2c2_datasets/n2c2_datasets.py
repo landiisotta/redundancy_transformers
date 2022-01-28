@@ -21,7 +21,9 @@ import datasets
 
 # Dataset description
 _DESCRIPTION = """\
-n2c2 datasets from different challenges for clinical notes redundancy investigation.
+Create n2c2 datasets from different challenges for clinical notes redundancy investigation.
+Configurations: (1) language_model: pretrained ClinicalBert fine-tuning on MLM and NSP tasks;
+(2) smoking_challenge: create dataset to fine-tune ClinicalBERT on the 2006 smoking challenge; 
 """
 
 # Link to the official homepage
@@ -29,7 +31,8 @@ _HOMEPAGE = "https://portal.dbmi.hms.harvard.edu/projects/n2c2-nlp/"
 
 # Uncomment the following line to load the dummy version of the data (e.g., for code debugging)
 # _FOLDER = {'language_model': './datasets/n2c2_datasets/dummy/language_model/0.0.1/dummy_data'}
-_FOLDER = {'language_model': './datasets/n2c2_datasets'}
+_FOLDER = {'language_model': './datasets/n2c2_datasets',
+           'smoking_challenge': './datasets/2006_smoking_status'}
 
 
 class N2c2Dataset(datasets.GeneratorBasedBuilder):
@@ -37,12 +40,15 @@ class N2c2Dataset(datasets.GeneratorBasedBuilder):
 
     VERSION = datasets.Version("0.0.1")
     BUILDER_CONFIGS = [datasets.BuilderConfig(name='language_model', version=VERSION,
-                                              description="Language model fine-tuning dataset")]
+                                              description="ClinicalBERT fine-tuning dataset"),
+                       datasets.BuilderConfig(name='smoking_challenge', version=VERSION,
+                                              description="2006 smoking status challenge")]
     DEFAULT_CONFIG_NAME = 'language_model'
 
     def _info(self):
         if self.config.name == 'language_model':
-            # TODO: This method specifies the datasets.DatasetInfo object which contains informations and typings for the dataset
+            # TODO: This method specifies the datasets.DatasetInfo object which contains
+            #  informations and typings for the dataset
             features = datasets.Features(
                 {
                     "sentence": datasets.Value("string"),
@@ -51,8 +57,16 @@ class N2c2Dataset(datasets.GeneratorBasedBuilder):
                     # These are the features of your dataset like images, labels ...
                 }
             )
+        elif self.config.name == 'smoking_challenge':
+            features = datasets.Features(
+                {
+                    "note": datasets.Value("string"),
+                    "id": datasets.Value("string"),
+                    "label": datasets.Value("string")
+                }
+            )
         else:
-            features = datasets.Features = {}
+            features = {}
             pass
         return datasets.DatasetInfo(
             # This is the description that will appear on the datasets page.
@@ -69,7 +83,8 @@ class N2c2Dataset(datasets.GeneratorBasedBuilder):
 
     def _split_generators(self, dl_manager):
         """Returns SplitGenerators."""
-        # TODO: This method is tasked with downloading/extracting the data and defining the splits depending on the configuration
+        # TODO: This method is tasked with downloading/extracting
+        #  the data and defining the splits depending on the configuration
         data_dir = _FOLDER[self.config.name]
         # data_dir = dl_manager.download_and_extract(_FOLDER[self.config.name])
         # data_dir = dl_manager.download_and_extract(my_files)
@@ -110,5 +125,12 @@ class N2c2Dataset(datasets.GeneratorBasedBuilder):
                         }
                     else:
                         continue
+                elif self.config.name == "smoking_challenge":
+                    if len(row) > 0:
+                        yield id_, {
+                            "note": row[-1],
+                            "id": str(row[0]),
+                            "label": str(row[1])
+                        }
                 else:
                     pass

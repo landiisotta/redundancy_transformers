@@ -13,7 +13,7 @@
 ml purge
 unset PYTHONPATH
 ml anaconda3/2021.5
-conda activate /sc/arion/work/landii03/conda/envs/redundancy
+source activate /sc/arion/work/landii03/conda/envs/redundancy
 unset PYTHONPATH
 
 # This file name will be used to create two txt files, i.e.,

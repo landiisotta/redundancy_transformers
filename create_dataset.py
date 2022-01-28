@@ -239,4 +239,4 @@ if __name__ == '__main__':
                     output_folder=config.output_folder)
 
     print(f"Train/test notes and dictionary keys saved")
-    print(f"Task ended in {round(time.time() - start, 2)}s.\n")
+    print(f"Task ended in {round(time.process_time() - start, 2)}s.\n")
