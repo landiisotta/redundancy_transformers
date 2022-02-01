@@ -2,10 +2,10 @@
 #BSUB -J fine-tuning-mlm
 #BSUB -P acc_psychgen
 #BSUB -q gpu
-#BSUB -n 16
+#BSUB -n 32
 #BSUB -W 144:00
 #BSUB -R a100
-#BSUB -R rusage[mem=8000,ngpus_excl_p=4]
+#BSUB -R rusage[mem=4000,ngpus_excl_p=2]
 #BSUB -o %J.stdout
 #BSUB -eo %J.stderr
 #BSUB -L /bin/bash
@@ -20,8 +20,8 @@ MAX_SEQ_LENGTH=512
 DATA_PATH=./datasets/n2c2_datasets/n2c2datasets_forClinicalBERTfinetuning_maxseqlen$MAX_SEQ_LENGTH.pkl
 CHECKPOINT=./models/pretrained_model/clinicalBERT/
 
-EPOCHS=12
-BATCH_SIZE=256
+EPOCHS=80
+BATCH_SIZE=32
 
 python -m fine_tune_bert \
   --checkpoint=$CHECKPOINT \
@@ -29,7 +29,7 @@ python -m fine_tune_bert \
   --epochs=$EPOCHS \
   --batch_size=$BATCH_SIZE \
   --learning_rate=1e-4 \
-  --num_training_steps=3000 \
-  --num_warmup_step=30 \
+  --num_training_steps=2660 \
+  --num_warmup_step=266 \
   --patience=4 \
   --dev

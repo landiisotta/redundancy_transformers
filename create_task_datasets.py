@@ -55,11 +55,11 @@ if __name__ == '__main__':
                                      './datasets/n2c2_datasets/test_newk_to_oldk.csv',
                                      test_labels,
                                      challenge='smoking')
-    with open('./datasets/2006_smoking_status/train_sentences.txt', 'w') as f:
+    with open('datasets/2006_smoking_status/train_sentences.txt', 'w') as f:
         wr = csv.writer(f)
         for line in chl_train:
             wr.writerow(line)
-    with open('./datasets/2006_smoking_status/test_sentences.txt', 'w') as f:
+    with open('datasets/2006_smoking_status/test_sentences.txt', 'w') as f:
         wr = csv.writer(f)
         for line in chl_test:
             wr.writerow(line)

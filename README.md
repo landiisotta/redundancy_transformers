@@ -142,13 +142,19 @@ fine-tune our MLM for 40,000 steps, i.e., 45 epochs
 (although we include the early stopping with patience 5 to avoid overfitting).
 
 ## Dataset loading
-The module `datasets/n2c2_datasets/n2c2_datasets` prepares the input Dataset object for fine-tuning the pretrained BERT 
-model (i.e., ClinicalBERT) on the MLM and NSP tasks. It was implemented based on the 
+The module `datasets/n2c2_datasets/n2c2_datasets` prepares the input Dataset objects. Several configurations are 
+ implemented, according to the needed  task. It was implemented based on the 
 [`huggingface` guide](https://huggingface.co/docs/datasets/add_dataset.html).
 
 The script `datasets/n2c2_datasets/n2c2_datasets.py` organizes notes in a `DatasetDict` object, with keys "train|test" 
-and values `Dataset` 
-objects with features "sentence", "document", "challenge". The script was tested running the following command in the 
+and values `Dataset`. Available configurations are:
+
+- _language_model_ where objects have features "sentence", "document", "challenge" and input datasets are found in 
+`datasets/n2c2_datasets`; 
+- _smoking_challenge_ where objects have features "note", "id", "label" and input datasets are found in folder 
+`datasets/2006_smoking_status`;
+
+The script was tested running the following command in the 
 project folder (root of the `datasets` folder):
 
 #### Step 1
@@ -158,24 +164,20 @@ datasets-cli test datasets/n2c2_datasets --save_infos --all_configs
 which return a `dataset_infos.json` file with dataset information.
 
 #### Step 2
-In order to run the second test and generate the dummy dataset, we needed to modify the file at 
-`<env_path>/lib/python3.9/site-packages/datasets/commands/dummy_data.py`
+In order to generate a dummy version for each dataset configuration we can run:
 
-Then we run
 ```
-datasets-cli dummy_data datasets/n2c2_datasets \
+python datasets/n2c2_datasets/datasets-cli dummy_data datasets/n2c2_datasets \
 --auto_generate \
 --n_lines=100 \
 --match_text_files='train_sentences.txt,test_sentences.txt'
 ```
-to create a dummy version of the data at `datasets/n2c2_datasets/dummy/0.0.1/dummy_data.zip`.
 
-#### Step 3
-```
-RUN_SLOW=1 pytest tests/test_dataset_common.py::LocalDatasetTest::test_load_real_dataset_n2c2_datasets
-RUN_SLOW=1 pytest tests/test_dataset_common.py::LocalDatasetTest::test_load_dataset_all_configs_n2c2_datasets
-```
-to test both real and dummy datasets.
+Dummy compressed folders can then be found in:
+
+- `datasets/n2c2_datasets/dummy/0.0.1/dummy_data.zip` for the `language_model` configuration;
+
+- `datasets/{config.data_folder}/dummy/0.0.1/dummy_data.zip` for the other configurations.
 
 A cached version of the data will be stored at `~/.cache/huggingface/datasets/n2c2_dataset/default/0.0.1`.  
 

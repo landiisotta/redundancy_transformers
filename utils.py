@@ -4,6 +4,9 @@ chll = ['smoking', 'obesity',
         'temp_rel', 'long',
         'med_extraction_tsk2']
 
+FOLDER = {'language_model': './datasets/n2c2_datasets',
+           'smoking_challenge': './datasets/2006_smoking_status'}
+
 # Folders where files are stores. Sub folder and file names were preserved.
 # Main folder names were changed
 train_files = {'smoking': '/2006_smoking_status',

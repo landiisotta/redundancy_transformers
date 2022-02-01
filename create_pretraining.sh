@@ -12,8 +12,8 @@
 
 ml purge
 unset PYTHONPATH
-ml anaconda3/2021.5
-source activate /sc/arion/work/landii03/conda/envs/redundancy
+ml python/3.8.2
+source /sc/arion/work/landii03/redundancy_a100/bin/activate
 unset PYTHONPATH
 
 DATA_DIR=n2c2_datasets #modify this to be the path to the tokenized data

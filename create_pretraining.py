@@ -1,5 +1,4 @@
 from transformers import AutoTokenizer
-import torch.utils.data
 import random
 from collections import namedtuple
 from collections import OrderedDict
@@ -14,31 +13,6 @@ import time
 
 MaskedLmInstance = namedtuple("MaskedLmInstance",
                               ["index", "label"])
-
-
-# Add memoization (?)
-class ClinicalBertDataset(torch.utils.data.Dataset):
-    """
-    It defines the Dataset object to be used to fine-tune
-    the BERT masked language model, with both masked token and next
-    sentence predictions.
-    """
-
-    def __init__(self, dataset, tokenizer):
-        self.dataset = dataset
-        self.tokenizer = tokenizer
-
-    def __getitem__(self, idx):
-        item = {key: torch.tensor(val[idx]) for key, val in self.dataset.items() if key in
-                ["input_ids",
-                 "attention_mask",
-                 "token_type_ids",
-                 "next_sentence_label",
-                 "labels"]}
-        return item
-
-    def __len__(self):
-        return len(self.dataset["input_ids"])
 
 
 class TrainingInstance(object):
@@ -287,7 +261,8 @@ def write_instance_to_example(instances, tokenizer, max_seq_length,
     for (inst_index, instance) in tqdm(enumerate(instances), desc='Creating input data'):
         # tokenizer.add_tokens(instance.tokens)
         input_ids = tokenizer.convert_tokens_to_ids(
-            instance.tokens)  # update vocab with new words given that the tokenization has been done with the raw split(' ') [to modify]
+            instance.tokens)
+        # update vocab with new words given that the tokenization has been done with the raw split(' ') [to modify]
         input_mask = [1] * len(input_ids)
         segment_ids = list(instance.segment_ids)
 
@@ -337,7 +312,7 @@ def write_instance_to_example(instances, tokenizer, max_seq_length,
 
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description="Create Dataset for model fine-tuning.")
+    parser = argparse.ArgumentParser(description="Create Dataset for model pretraining.")
     parser.add_argument('-dt',
                         '--dataset_name',
                         type=str,
@@ -395,4 +370,4 @@ if __name__ == '__main__':
                                                                              config.max_seq_length,
                                                                              config.max_predictions_per_seq)
     pkl.dump((DatasetDict(processed_data), tokenizers), open(os.path.join('./datasets', config.output_file), 'wb'))
-    print(f"Process ended in {round(time.time() - start, 2)}")
+    print(f"Process ended in {round(time.time() - start, 2)}s")

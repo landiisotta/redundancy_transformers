@@ -30,9 +30,16 @@ Configurations: (1) language_model: pretrained ClinicalBert fine-tuning on MLM a
 _HOMEPAGE = "https://portal.dbmi.hms.harvard.edu/projects/n2c2-nlp/"
 
 # Uncomment the following line to load the dummy version of the data (e.g., for code debugging)
-# _FOLDER = {'language_model': './datasets/n2c2_datasets/dummy/language_model/0.0.1/dummy_data'}
+# _FOLDER = {'language_model': './datasets/n2c2_datasets/dummy/language_model/0.0.1/dummy_data',
+# 'smoking_challenge': './datasets/2006_smoking_status/dummy/language_model/0.0.1/dummy_data'}
 _FOLDER = {'language_model': './datasets/n2c2_datasets',
            'smoking_challenge': './datasets/2006_smoking_status'}
+
+_SMOKING_LABELS = {'NON-SMOKER': 0,
+                   'CURRENT SMOKER': 1,
+                   'SMOKER': 2,
+                   'PAST SMOKER': 3,
+                   'UNKNOWN': 4}
 
 
 class N2c2Dataset(datasets.GeneratorBasedBuilder):
@@ -40,9 +47,11 @@ class N2c2Dataset(datasets.GeneratorBasedBuilder):
 
     VERSION = datasets.Version("0.0.1")
     BUILDER_CONFIGS = [datasets.BuilderConfig(name='language_model', version=VERSION,
-                                              description="ClinicalBERT fine-tuning dataset"),
+                                              description="ClinicalBERT fine-tuning dataset",
+                                              data_dir='./'),
                        datasets.BuilderConfig(name='smoking_challenge', version=VERSION,
-                                              description="2006 smoking status challenge")]
+                                              description="2006 smoking status challenge",
+                                              data_dir='../2006_smoking_status')]
     DEFAULT_CONFIG_NAME = 'language_model'
 
     def _info(self):
@@ -62,7 +71,7 @@ class N2c2Dataset(datasets.GeneratorBasedBuilder):
                 {
                     "note": datasets.Value("string"),
                     "id": datasets.Value("string"),
-                    "label": datasets.Value("string")
+                    "label": datasets.ClassLabel(5)
                 }
             )
         else:
@@ -86,6 +95,7 @@ class N2c2Dataset(datasets.GeneratorBasedBuilder):
         # TODO: This method is tasked with downloading/extracting
         #  the data and defining the splits depending on the configuration
         data_dir = _FOLDER[self.config.name]
+        print(f"My data_dir: {data_dir}")
         # data_dir = dl_manager.download_and_extract(_FOLDER[self.config.name])
         # data_dir = dl_manager.download_and_extract(my_files)
         return [
@@ -130,7 +140,7 @@ class N2c2Dataset(datasets.GeneratorBasedBuilder):
                         yield id_, {
                             "note": row[-1],
                             "id": str(row[0]),
-                            "label": str(row[1])
+                            "label": _SMOKING_LABELS[str(row[1])]
                         }
                 else:
                     pass
