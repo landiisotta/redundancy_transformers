@@ -1,5 +1,5 @@
 #!/bin/bash
-#BSUB -J redundancy_pretraining
+#BSUB -J create-pretraining-dataset
 #BSUB -P acc_psychgen
 #BSUB -q express
 #BSUB -n 64

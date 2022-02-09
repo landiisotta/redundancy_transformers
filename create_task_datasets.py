@@ -45,7 +45,8 @@ def create_challenge_note(sentences, key_dict, labels, challenge):
 if __name__ == '__main__':
     # Smoking challenge
     train_labels = extract_smoking_status('./datasets/2006_smoking_status/smokers_surrogate_train_all_version2.xml')
-    test_labels = extract_smoking_status('./datasets/2006_smoking_status/smokers_surrogate_test_all_groundtruth_version2.xml')
+    test_labels = extract_smoking_status(
+        './datasets/2006_smoking_status/smokers_surrogate_test_all_groundtruth_version2.xml')
 
     chl_train = create_challenge_note('./datasets/n2c2_datasets/train_sentences.txt',
                                       './datasets/n2c2_datasets/train_newk_to_oldk.csv',
@@ -63,5 +64,3 @@ if __name__ == '__main__':
         wr = csv.writer(f)
         for line in chl_test:
             wr.writerow(line)
-
-

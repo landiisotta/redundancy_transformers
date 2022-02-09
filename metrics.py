@@ -1,6 +1,7 @@
 from torch.nn import CrossEntropyLoss
 import numpy as np
 import torch
+from sklearn.metrics import f1_score, precision_score, recall_score
 
 # Loss function
 ce = CrossEntropyLoss()
@@ -11,6 +12,7 @@ class LmMetrics(object):
     Metrics to evaluate the fine-tuning of ClinicalBERT model
     on MLM, NSP, and LM tasks.
     """
+
     def __init__(self, sample_size=None):
         if not sample_size:
             print('Metrics are returned as sum over batches. '
@@ -93,3 +95,69 @@ class LmMetrics(object):
             lab_len = len([rf for rf in r_vect if rf != -100])
             acc += sum(i == j for i, j in zip(p_vect, r_vect) if j != -100) / lab_len
         return acc
+
+
+class TaskMetrics(object):
+    """
+    Challenge metrics
+    """
+
+    def __init__(self, challenge):
+        self.challenge = challenge
+        self.model_labels = {'true_labels': [],
+                             'pred_labels': []}
+        # self.batch_metrics = {}
+        # if self.challenge == 'smoking_challenge':
+        #     self.model_metrics = {'f1_score': [],
+        #                           'f1_micro': [],
+        #                           'f1_macro': [],
+        #                           'precision': [],
+        #                           'precision_micro': [],
+        #                           'precision_macro': [],
+        #                           'recall': [],
+        #                           'recall_micro': [],
+        #                           'recall_macro': []}
+        # else:
+        #     self.model_metrics = {}
+
+    def add_batch(self, true, pred):
+        self.model_labels['true_labels'].append(true)
+        self.model_labels['pred_labels'].append(pred)
+
+    def compute(self):
+        return {'f1_score': self._f1_score(self.model_labels['true_labels'],
+                                           self.model_labels['pred_labels']),
+                'precision': self._precision(self.model_labels['true_labels'],
+                                             self.model_labels['pred_labels']),
+                'recall': self._recall(self.model_labels['true_labels'],
+                                       self.model_labels['pred_labels'])}
+
+    @staticmethod
+    def _f1_score(true, pred):
+        single_score = f1_score(true, pred, average=None)
+        scores = {}
+        for cl, s in enumerate(single_score):
+            scores[f'f1_class{cl}'] = s
+        scores['micro'] = f1_score(true, pred, average='micro')
+        scores['macro'] = f1_score(true, pred, average='macro')
+        return scores
+
+    @staticmethod
+    def _precision(true, pred):
+        single_score = precision_score(true, pred, average=None)
+        scores = {}
+        for cl, s in enumerate(single_score):
+            scores[f'p_class{cl}'] = s
+        scores['micro'] = precision_score(true, pred, average='micro')
+        scores['macro'] = precision_score(true, pred, average='macro')
+        return scores
+
+    @staticmethod
+    def _recall(true, pred):
+        single_score = recall_score(true, pred, average=None)
+        scores = {}
+        for cl, s in enumerate(single_score):
+            scores[f'r_class{cl}'] = s
+        scores['micro'] = recall_score(true, pred, average='micro')
+        scores['macro'] = recall_score(true, pred, average='macro')
+        return scores

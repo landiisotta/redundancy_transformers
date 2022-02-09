@@ -108,7 +108,8 @@ def train_and_eval(train_dataloader,
         print(f"Metrics at early stopped epoch {epoch_chkpt}: {eval_metrics}")
         print(f"Loss at early stopped epoch {epoch_chkpt}: {loss}")
 
-    torch.save(model.state_dict(), './runs/BERT-fine-tuning/best_model.pt')
+    # torch.save(model.state_dict(), './runs/BERT-fine-tuning/best_model.pt')
+    model.module.save_pretrained('./runs/BERT-fine-tuning')
 
     writer_train.close()
     writer_val.close()

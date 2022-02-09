@@ -31,7 +31,7 @@ _HOMEPAGE = "https://portal.dbmi.hms.harvard.edu/projects/n2c2-nlp/"
 
 # Uncomment the following line to load the dummy version of the data (e.g., for code debugging)
 # _FOLDER = {'language_model': './datasets/n2c2_datasets/dummy/language_model/0.0.1/dummy_data',
-# 'smoking_challenge': './datasets/2006_smoking_status/dummy/language_model/0.0.1/dummy_data'}
+#            'smoking_challenge': './datasets/2006_smoking_status/dummy/smoking_challenge/0.0.1/dummy_data'}
 _FOLDER = {'language_model': './datasets/n2c2_datasets',
            'smoking_challenge': './datasets/2006_smoking_status'}
 
@@ -95,7 +95,6 @@ class N2c2Dataset(datasets.GeneratorBasedBuilder):
         # TODO: This method is tasked with downloading/extracting
         #  the data and defining the splits depending on the configuration
         data_dir = _FOLDER[self.config.name]
-        print(f"My data_dir: {data_dir}")
         # data_dir = dl_manager.download_and_extract(_FOLDER[self.config.name])
         # data_dir = dl_manager.download_and_extract(my_files)
         return [
