@@ -17,19 +17,20 @@ source /sc/arion/work/landii03/redundancy_a100/bin/activate
 unset PYTHONPATH
 
 MAX_SEQ_LENGTH=512
-DATA_PATH=./datasets/n2c2_datasets/n2c2datasets_forClinicalBERTfinetuning_maxseqlen$MAX_SEQ_LENGTH.pkl
+DATA_PATH=./datasets/n2c2_datasets/n2c2datasets_forClinicalBERTfinetuning_maxseqlen$MAX_SEQ_LENGTH$EPOCHS$BATCH_SIZE$LEARNING_RATE.pkl
 CHECKPOINT=./models/pretrained_model/clinicalBERT/
 
 EPOCHS=50
 BATCH_SIZE=64
+LEARNING_RATE=1e-5
 
 python -m fine_tune_bert \
   --checkpoint=$CHECKPOINT \
-  --data_path=$DATA_PATH \
+  --data_path="$DATA_PATH" \
   --epochs=$EPOCHS \
   --batch_size=$BATCH_SIZE \
-  --learning_rate=1e-4 \
-  --num_training_steps=13300 \
-  --num_warmup_step=133 \
-  --patience=4 \
+  --learning_rate=$LEARNING_RATE \
+  --num_training_steps=3200 \
+  --num_warmup_step=32 \
+  --patience=9 \
   --dev

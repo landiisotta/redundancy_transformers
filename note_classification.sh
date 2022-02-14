@@ -18,11 +18,12 @@ unset PYTHONPATH
 
 DATAPATH=./datasets/2006_smoking_status/smoking_challenge_task_dataset_maxlen512ws100.pkl
 CHECKPOINT=./runs/BERT-fine-tuning
-EPOCHS=10
+EPOCHS=3
 
 python -m note_classification \
   --dataset=$DATAPATH \
   --checkpoint=$CHECKPOINT \
   --epochs=$EPOCHS \
-  --learning_rate=5e-5 \
-  --n_classes=5
+  --learning_rate=1e-5 \
+  --n_classes=5 \
+  --weighting

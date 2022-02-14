@@ -5,7 +5,7 @@ from eval import test
 import metrics
 
 DEVICE = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
-GPUS = torch.cuda.device_count()
+GPUS = max(torch.cuda.device_count(), 1)
 PROGRESS_BAR = tqdm()
 
 

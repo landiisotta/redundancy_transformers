@@ -2,6 +2,7 @@ from torch.nn import CrossEntropyLoss
 import numpy as np
 import torch
 from sklearn.metrics import f1_score, precision_score, recall_score
+from collections import OrderedDict
 
 # Loss function
 ce = CrossEntropyLoss()
@@ -121,43 +122,47 @@ class TaskMetrics(object):
         #     self.model_metrics = {}
 
     def add_batch(self, true, pred):
-        self.model_labels['true_labels'].append(true)
-        self.model_labels['pred_labels'].append(pred)
+        if isinstance(pred, list):
+            self.model_labels['true_labels'].extend(true)
+            self.model_labels['pred_labels'].extend(pred)
+        else:
+            self.model_labels['true_labels'].append(true)
+            self.model_labels['pred_labels'].append(pred)
 
     def compute(self):
-        return {'f1_score': self._f1_score(self.model_labels['true_labels'],
-                                           self.model_labels['pred_labels']),
-                'precision': self._precision(self.model_labels['true_labels'],
-                                             self.model_labels['pred_labels']),
-                'recall': self._recall(self.model_labels['true_labels'],
-                                       self.model_labels['pred_labels'])}
+        return OrderedDict({'f1_score': self._f1_score(self.model_labels['true_labels'],
+                                                       self.model_labels['pred_labels']),
+                            'precision': self._precision(self.model_labels['true_labels'],
+                                                         self.model_labels['pred_labels']),
+                            'recall': self._recall(self.model_labels['true_labels'],
+                                                   self.model_labels['pred_labels'])})
 
     @staticmethod
     def _f1_score(true, pred):
         single_score = f1_score(true, pred, average=None)
-        scores = {}
+        scores = OrderedDict()
+        scores['f1_micro'] = f1_score(true, pred, average='micro')
+        scores['f1_macro'] = f1_score(true, pred, average='macro')
         for cl, s in enumerate(single_score):
             scores[f'f1_class{cl}'] = s
-        scores['micro'] = f1_score(true, pred, average='micro')
-        scores['macro'] = f1_score(true, pred, average='macro')
         return scores
 
     @staticmethod
     def _precision(true, pred):
         single_score = precision_score(true, pred, average=None)
-        scores = {}
+        scores = OrderedDict()
+        scores['p_micro'] = precision_score(true, pred, average='micro')
+        scores['p_macro'] = precision_score(true, pred, average='macro')
         for cl, s in enumerate(single_score):
             scores[f'p_class{cl}'] = s
-        scores['micro'] = precision_score(true, pred, average='micro')
-        scores['macro'] = precision_score(true, pred, average='macro')
         return scores
 
     @staticmethod
     def _recall(true, pred):
         single_score = recall_score(true, pred, average=None)
-        scores = {}
+        scores = OrderedDict()
+        scores['r_micro'] = recall_score(true, pred, average='micro')
+        scores['r_macro'] = recall_score(true, pred, average='macro')
         for cl, s in enumerate(single_score):
             scores[f'r_class{cl}'] = s
-        scores['micro'] = recall_score(true, pred, average='micro')
-        scores['macro'] = recall_score(true, pred, average='macro')
         return scores

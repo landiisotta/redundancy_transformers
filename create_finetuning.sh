@@ -19,17 +19,17 @@ unset PYTHONPATH
 DATASET=n2c2_datasets
 CHALLENGE=smoking_challenge
 MAX_SEQ_LENGTH=512
-WINDOW_SIZE=100
+#WINDOW_SIZE=10
 
 OUTPUT=2006_smoking_status
 
-SEED=42
+SEED=1234
 
 python -m create_finetuning \
   --dataset=$DATASET \
   --challenge=$CHALLENGE \
   --output=$OUTPUT \
   --max_seq_length=$MAX_SEQ_LENGTH \
-  --window_size=$WINDOW_SIZE \
-  --seed=$SEED \
-  --create_val=0.20
+  --create_val=0.30 \
+  --random_seed=$SEED #\
+  #  --window_size=$WINDOW_SIZE

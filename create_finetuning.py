@@ -136,15 +136,14 @@ if __name__ == '__main__':
                         default=None,
                         help='Validation percentage, default None',
                         dest='create_val')
-    parser.add_argument('--seed',
+    parser.add_argument('--random_seed',
                         type=int,
-                        help="Random seed for replicability",
-                        dest='random_seed')
+                        dest='random_seed',
+                        help='Random seed for replicable splits')
     start = time.process_time()
 
     config = parser.parse_args(sys.argv[1:])
 
-    rng = random.Random(config.random_seed)
     tokenizer = AutoTokenizer.from_pretrained(ut.checkpoint)
 
     dt = load_dataset(os.path.join('./datasets', config.dataset), name=config.challenge)

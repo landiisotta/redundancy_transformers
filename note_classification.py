@@ -3,16 +3,19 @@ from tqdm.auto import tqdm
 from torch import nn
 from torch.utils.tensorboard import SummaryWriter
 import numpy as np
-from transformers import AutoModelForSequenceClassification, AdamW, get_scheduler
+from transformers import AutoModelForSequenceClassification
+from transformers.optimization import get_polynomial_decay_schedule_with_warmup, AdamW, get_scheduler
 import sys
 from argparse import ArgumentParser
 from torch.utils.data import DataLoader
 import pickle as pkl
 import metrics
 import time
+import csv
+import os
 
 DEVICE = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
-GPUS = torch.cuda.device_count()
+GPUS = max(torch.cuda.device_count(), 1)
 
 
 # Smoking challenge
@@ -22,7 +25,9 @@ def training(train_set,
              dev_set,
              model,
              optimizer,
-             lr_scheduler):
+             lr_scheduler,
+             batches,
+             weighting):
     """
     Training/validation step.
 
@@ -31,6 +36,8 @@ def training(train_set,
     :param model:
     :param optimizer:
     :param lr_scheduler:
+    :param batches:
+    :param weighting:
     :return: training and validation loss
     """
     # Training
@@ -41,15 +48,20 @@ def training(train_set,
         batch = {k: v.to(DEVICE) for k, v in batch.items()}
         outputs = model(**batch)
 
-        wloss, _ = _compute_wloss(batch, outputs)
-
-        wloss.backward()
+        wloss, _ = _compute_wloss(batch, outputs, batches, weighting)
+        wloss.sum().backward()
         optimizer.step()
         lr_scheduler.step()
         optimizer.zero_grad()
         progress_bar.update(1)
 
-        loss_batches += wloss.sum().item()
+        if weighting:
+            loss_batches += wloss.sum().item()
+        else:
+            if batches:
+                loss_batches += wloss.sum().item() * batch['input_ids'].shape[0]
+            else:
+                loss_batches += wloss.sum().item()
 
     # Validation
     model.eval()
@@ -60,11 +72,22 @@ def training(train_set,
         with torch.no_grad():
             outputs = model(**batch)
 
-        val_loss, output_logits = _compute_wloss(batch, outputs)
-        loss_batches_eval += val_loss.sum().item()
+        val_loss, output_logits = _compute_wloss(batch, outputs, batches, weighting)
 
-        train_metrics.add_batch(batch['labels'][0].item(),
-                                torch.argmax(output_logits).item())
+        if weighting:
+            loss_batches_eval += val_loss.sum().item()
+            train_metrics.add_batch(batch['labels'][0].item(),
+                                    torch.argmax(output_logits).item())
+        else:
+            if batches:
+                loss_batches_eval += val_loss.sum().item() * batch['input_ids'].shape[0]
+                # extend
+                train_metrics.add_batch(batch['labels'].view(-1).tolist(),
+                                        torch.argmax(outputs.logits, dim=-1).tolist())
+            else:
+                loss_batches_eval += val_loss.sum().item()
+                train_metrics.add_batch(batch['labels'][0].item(),
+                                        torch.argmax(output_logits).item())
 
     return loss_batches / (len(train_set.sampler) * GPUS), loss_batches_eval / (
             len(dev_set.sampler) * GPUS), train_metrics.compute()
@@ -87,23 +110,45 @@ def _collate_fn(batch):
             'labels': torch.tensor([[lab] for lab in labels])}
 
 
-def _compute_wloss(batch, outputs):
+def _collate_fn_batch(batch):
     """
-    Compute loss of overlapping note chunks weighting more the initial vectors.
+    Custom collate function for DataLoader.
     """
-    if batch['input_ids'].shape[0] > 1:
+    input_ids, labels = [], []
+    for b in batch:
+        input_ids.append(b['input_ids'][0])
+        labels.append(b['labels'][0])
+    return {'input_ids': torch.tensor(input_ids),
+            'labels': torch.tensor([[lab] for lab in labels])}
+
+
+def _compute_wloss(batch, outputs, batches, weighting_method):
+    """
+    If weighting method is enabled: compute loss of overlapping note chunks weighting more the initial vectors;
+     Otherwise: return batched loss.
+    """
+    if weighting_method:
         # weight initial vectors more
         mid = float(int(batch['input_ids'].shape[0] / 2))
-        norm_dist = np.array(
-            [(i / mid) for i in range(batch['input_ids'].shape[0])])
+        if mid > 0:
+            norm_dist = np.array(
+                [(i / mid) for i in range(batch['input_ids'].shape[0])])
+            weights = torch.tensor(np.array([_normal_density(norm_dist, 0, 1)]), device=DEVICE).double()
+        else:
+            weights = torch.tensor(np.array([[1]]), device=DEVICE).double()
 
-        weights = torch.tensor(np.array([_normal_density(norm_dist, 0, 1)]), device=DEVICE).double()
         wloss = nn.functional.cross_entropy(torch.matmul(weights, outputs.logits),
                                             batch['labels'][0].view(-1))
         output_logits = torch.matmul(weights, outputs.logits)
     else:
-        wloss = outputs.loss
-        output_logits = outputs.logits
+        if batches:
+            wloss = outputs.loss
+            output_logits = outputs.logits
+        else:
+            weights = torch.tensor(np.array([[1] * batch['labels'].shape[0]]), device=DEVICE).double()
+            wloss = nn.functional.cross_entropy(torch.matmul(weights, outputs.logits),
+                                                batch['labels'][0].view(-1))
+            output_logits = torch.matmul(weights, outputs.logits)
 
     return wloss, output_logits
 
@@ -130,6 +175,19 @@ if __name__ == '__main__':
                         type=int,
                         help='Number of classes',
                         dest='n_classes')
+    parser.add_argument('--batch_size',
+                        type=int,
+                        help='If non-overlapping notes N batches',
+                        dest='batch_size',
+                        default=None)
+    parser.add_argument('--weighting',
+                        help='Enabling weighting strategy for overlapping note chunks',
+                        dest='weighting',
+                        action='store_true')
+    parser.add_argument('--no-weighting',
+                        help='Disable weighting strategy',
+                        dest='weighting',
+                        action='store_false')
 
     start = time.process_time()
 
@@ -137,46 +195,105 @@ if __name__ == '__main__':
     torch.cuda.manual_seed(42)
 
     config = parser.parse_args(sys.argv[1:])
-    writer_train = SummaryWriter('./runs/BERT-task-smoking/tensorboard/train')
-    writer_val = SummaryWriter('./runs/BERT-task-smoking/tensorboard/validation')
 
-    writer_test = SummaryWriter('./runs/BERT-task-smoking/tensorboard/test')
+    writer_train = SummaryWriter(f'./runs/BERT-task-smoking/tensorboard/train/{config.learning_rate}')
+    writer_val = SummaryWriter(f'./runs/BERT-task-smoking/tensorboard/validation/{config.learning_rate}')
+    writer_test = SummaryWriter(f'./runs/BERT-task-smoking/tensorboard/test/{config.learning_rate}')
 
     model = AutoModelForSequenceClassification.from_pretrained(config.checkpoint,
                                                                num_labels=config.n_classes)
     model = model.double()
 
     data = pkl.load(open(config.dataset, 'rb'))
+    ws = config.dataset.split('ws')[-1].split('.')[0]
+    seqlen = config.dataset.split('maxlen')[-1].split('ws')[0]
+
     train, val, test = data['train'], data['validation'], data['test']
 
-    train_loader = DataLoader(train,
-                              collate_fn=_collate_fn,
-                              shuffle=True,
-                              batch_size=None,
-                              batch_sampler=None)
-    val_loader = DataLoader(val,
-                            collate_fn=_collate_fn,
-                            shuffle=False,
-                            batch_size=None,
-                            batch_sampler=None)
-    test_loader = DataLoader(test,
-                             collate_fn=_collate_fn,
-                             shuffle=False,
-                             batch_size=None,
-                             batch_sampler=None)
+    if config.batch_size:
+        if config.weighting:
+            print("Weighting strategy is incompatible with batching, disabling it.")
+            config.weighting = False
+        if ws != 'None':
+            print(f"Collating data into batches of size {config.batch_size}, please note that "
+                  f"Dataset configuration has window enabled at {ws}, this will cut the note at the length defined"
+                  f" {seqlen}. No weighting method applied.")
+        else:
+            print(f"Collating data into batches of size {config.batch_size}.")
+        train_loader = DataLoader(train,
+                                  shuffle=True,
+                                  collate_fn=_collate_fn_batch,
+                                  batch_size=config.batch_size)
+        val_loader = DataLoader(val,
+                                shuffle=False,
+                                collate_fn=_collate_fn_batch,
+                                batch_size=config.batch_size)
+        test_loader = DataLoader(test,
+                                 shuffle=False,
+                                 collate_fn=_collate_fn_batch,
+                                 batch_size=config.batch_size)
+    else:
+        if ws == 'None':
+            print("Window is not present, but because batch size has not been specified, experiment"
+                  f" will be run with batch size = 1.")
+            if config.weighting:
+                print("Weighting strategy cannot be applied with batch size = 1. Disabling it.")
+                config.weighting = False
+        train_loader = DataLoader(train,
+                                  collate_fn=_collate_fn,
+                                  shuffle=True,
+                                  batch_size=None,
+                                  batch_sampler=None)
+        val_loader = DataLoader(val,
+                                collate_fn=_collate_fn,
+                                shuffle=False,
+                                batch_size=None,
+                                batch_sampler=None)
+        test_loader = DataLoader(test,
+                                 collate_fn=_collate_fn,
+                                 shuffle=False,
+                                 batch_size=None,
+                                 batch_sampler=None)
 
     num_training_steps = config.epochs * len(train_loader)
+    warmup_steps = round(num_training_steps / 100)
+    print(f"Training steps: {num_training_steps}")
+    print(f"Warmup steps: {warmup_steps}")
+    print(f"Learning rate: {config.learning_rate}\n")
+
     progress_bar = tqdm(range(num_training_steps))
 
     optimizer = AdamW(model.parameters(), lr=config.learning_rate)
-    lr_scheduler = get_scheduler("linear", optimizer=optimizer,
-                                 num_warmup_steps=round(num_training_steps / 100),
-                                 num_training_steps=num_training_steps)
+    # lr_scheduler = get_polynomial_decay_schedule_with_warmup(optimizer=optimizer,
+    #                                                          num_warmup_steps=warmup_steps,
+    #                                                          num_training_steps=num_training_steps,
+    #                                                          lr_end=0.0,
+    #                                                          power=1.0,
+    #                                                          last_epoch=-1)
+    lr_scheduler = get_scheduler('linear',
+                                 num_warmup_steps=warmup_steps,
+                                 num_training_steps=num_training_steps,
+                                 optimizer=optimizer)
 
     # Run on multiple GPUs if available
     if torch.cuda.device_count() > 1:
         print("Using", torch.cuda.device_count(), "GPUs")
         model = nn.DataParallel(model)
+
+    val_split = round(val.num_rows / train.num_rows, 1)
+    if not os.path.isdir('./runs/BERT-task-smoking/experiments'):
+        os.makedirs('./runs/BERT-task-smoking/experiments')
+    metrics_file = open(os.path.join('./runs/BERT-task-smoking/experiments/',
+                                     f'metrics_valsplit{val_split}lr{config.learning_rate}ws{ws}seqlen{seqlen}batch'
+                                     f'{config.batch_size}weights{config.weighting}.csv'), 'w')
+    wr = csv.writer(metrics_file)
+    colnames = ['learning_rate', 'val_split', 'window_size', 'sequence_length', 'batch_size', 'weighting_enabled',
+                'epoch', 'tr_loss', 'val_loss'] + ['f1_micro', 'f1_macro'] + \
+               [f'f1_class{cl}' for cl in range(config.n_classes)] + ['p_micro', 'p_macro'] + \
+               [f'p_class{cl}' for cl in range(config.n_classes)] + ['r_micro', 'r_macro'] + \
+               [f'r_class{cl}' for cl in range(config.n_classes)]
+    wr.writerow(colnames)
+    fixed_info = [config.learning_rate, val_split, ws, seqlen, config.batch_size, config.weighting]
 
     model.to(DEVICE)
     # Training
@@ -185,13 +302,17 @@ if __name__ == '__main__':
                                                   val_loader,
                                                   model,
                                                   optimizer,
-                                                  lr_scheduler)
+                                                  lr_scheduler,
+                                                  config.batch_size,
+                                                  config.weighting)
+        line = fixed_info + [epoch, tr_loss, val_loss]
         writer_train.add_scalar('epoch_loss', tr_loss, epoch)
         writer_val.add_scalar('epoch_loss', val_loss, epoch)
         for k in val_metrics.keys():
             for kk, score in val_metrics[k].items():
                 writer_val.add_scalar(f'Validation {kk}', score, epoch)
-        if epoch % 2 == 0:
+                line.append(score)
+        if epoch % 10 == 0 or epoch == (config.epochs - 1):
             print(f"Epoch {epoch} -- Training loss {round(tr_loss, 4)}")
             print(f"Epoch {epoch} -- Validation loss {round(val_loss, 4)}")
             print('\n')
@@ -201,30 +322,55 @@ if __name__ == '__main__':
                 for kk, val in val_metrics[k].items():
                     print(f"{kk}: {val}")
                 print('\n')
+                # Save checkpoint
+            torch.save({
+                'epoch': epoch,
+                'model_state_dict': model.state_dict(),
+                'optimizer_state_dict': optimizer.state_dict(),
+                'loss': tr_loss}, f'./runs/BERT-task-smoking/checkpoint.pt')
+        wr.writerow(line)
     # Test
+    line = fixed_info + ['', '', '']
     model.eval()
     test_metrics = metrics.TaskMetrics(challenge='smoking_challenge')
     test_loss = 0
-
     for test_batch in test_loader:
+        test_batch = {k: v.to(DEVICE) for k, v in test_batch.items()}
         with torch.no_grad():
             outputs = model(**test_batch)
-        wloss, output_logits = _compute_wloss(test_batch, outputs)
-        test_metrics.add_batch(test_batch['labels'][0].item(), torch.argmax(output_logits).item())
-        test_loss += wloss.sum()
+
+        wloss, output_logits = _compute_wloss(test_batch,
+                                              outputs,
+                                              config.batch_size,
+                                              weighting_method=config.weighting)
+        if config.weighting:
+            test_metrics.add_batch(test_batch['labels'][0].item(), torch.argmax(output_logits).item())
+            test_loss += wloss.sum().item()
+        else:
+            if config.batch_size:
+                test_loss += wloss.sum().item() * test_batch['input_ids'].shape[0]
+                # extend
+                test_metrics.add_batch(test_batch['labels'].view(-1).tolist(),
+                                       torch.argmax(outputs.logits, dim=-1).tolist())
+            else:
+                test_metrics.add_batch(test_batch['labels'][0].item(), torch.argmax(output_logits).item())
+                test_loss += wloss.sum().item()
 
     eval_metrics = test_metrics.compute()
+    writer_test.add_scalar('Test loss', test_loss / (len(test_loader) * GPUS))
 
-    writer_test.add_scalar('Test loss', test_loss / (len(test_loader.sampler) * GPUS))
     for k in eval_metrics.keys():
         for kk, score in eval_metrics[k].items():
             writer_test.add_scalar(f'Test {kk}', score)
+            line.append(score)
+    wr.writerow(line)
 
     print("Test set metrics:")
-    for k in test_metrics.keys():
+    for k in eval_metrics.keys():
         print(k)
-        for kk, val in test_metrics[k].items():
+        for kk, val in eval_metrics[k].items():
             print(f"{kk}: {val}")
         print('\n')
-
+    model.module.save_pretrained('./runs/BERT-task-smoking')
     print(f"Note classification task ended in: {round(time.process_time() - start, 2)}s")
+    metrics_file.close()
