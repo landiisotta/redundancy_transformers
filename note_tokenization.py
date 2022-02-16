@@ -142,8 +142,11 @@ if __name__ == '__main__':
                 for t in s:
                     if t.is_alpha and not t._.is_list:
                         tkn.append(t.text)
-                f.write(','.join(n[:2]) + ',' + ' '.join(tkn))
-                f.write('\n')
+                if len(tkn) > 0:
+                    f.write(','.join(n[:2]) + ',' + ' '.join(tkn))
+                    f.write('\n')
+                else:
+                    continue
             f.write('\n')
     print('\n')
     print(f"Process ended in {round(time.time() - start, 2)}\n")

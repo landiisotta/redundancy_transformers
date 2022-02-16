@@ -184,6 +184,23 @@ A cached version of the data will be stored at `~/.cache/huggingface/datasets/n2
 **Remark**: this loading dataset script can be edited to add dataset configurations other than the "language model", 
 e.g., for specific tasks.
 
+# Task-based model
+## Smoking challenge (2006)
+A corresponding dataset configuration, i.e., `smoking_challenge` in the `n2c2_datasets.py` module allows for the creation 
+of the task Dataset. As a first step data are organized in labeled train/test sentences through the `create_task_datasets.py` script.
+
+To prepare the DatasetDict for the newly pretrained ClinicalBert fine-tuning run:
+ ```
+sh create_finetuning.sh
+```
+ For the fine-tuning step:
+
+```
+sh note_classification.sh
+```
+
+## Cohort selection (2018 task 1)
+
 # References
 <a id="1">[1]</a> Uzuner, Ö., Goldstein, I., Luo, Y., & Kohane, I. (2008). Identifying patient smoking status from medical 
 discharge records. _Journal of the American Medical Informatics Association_, 15(1), 14-24.  

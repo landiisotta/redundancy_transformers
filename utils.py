@@ -1,7 +1,10 @@
 # n2c2 challenge datasets folder names
-chll = ['smoking', 'obesity',
-        'med_extraction', 'cpt_extraction',
-        'temp_rel', 'long',
+chll = ['smoking',
+        'obesity',
+        'med_extraction',
+        'cpt_extraction',
+        'temp_rel',
+        'long',
         'med_extraction_tsk2']
 
 FOLDER = {'language_model': './datasets/n2c2_datasets',

@@ -31,15 +31,20 @@ _HOMEPAGE = "https://portal.dbmi.hms.harvard.edu/projects/n2c2-nlp/"
 
 # Uncomment the following line to load the dummy version of the data (e.g., for code debugging)
 # _FOLDER = {'language_model': './datasets/n2c2_datasets/dummy/language_model/0.0.1/dummy_data',
-#            'smoking_challenge': './datasets/2006_smoking_status/dummy/smoking_challenge/0.0.1/dummy_data'}
+#            'smoking_challenge': './datasets/2006_smoking_status/dummy/smoking_challenge/0.0.1/dummy_data',
+#            'cohort_selection_challenge': './datasets/2018_cohort_selection/dummy/cohort_selection_challenge/0.0.1/dummy_data'}
 _FOLDER = {'language_model': './datasets/n2c2_datasets',
-           'smoking_challenge': './datasets/2006_smoking_status'}
+           'smoking_challenge': './datasets/2006_smoking_status',
+           'cohort_selection_challenge': './datasets/2018_cohort_selection'}
 
 _SMOKING_LABELS = {'NON-SMOKER': 0,
                    'CURRENT SMOKER': 1,
                    'SMOKER': 2,
                    'PAST SMOKER': 3,
                    'UNKNOWN': 4}
+
+_COHORT_TAGS = ["ABDOMINAL", "ADVANCED-CAD", "ALCOHOL-ABUSE", "ASP-FOR-MI", "CREATININE", "DIETSUPP-2MOS", "DRUG-ABUSE",
+                "ENGLISH", "HBA1C", "KETO-1YR", "MAJOR-DIABETES", "MAKES-DECISIONS", "MI-6MOS"]
 
 
 class N2c2Dataset(datasets.GeneratorBasedBuilder):
@@ -51,7 +56,11 @@ class N2c2Dataset(datasets.GeneratorBasedBuilder):
                                               data_dir='./'),
                        datasets.BuilderConfig(name='smoking_challenge', version=VERSION,
                                               description="2006 smoking status challenge",
-                                              data_dir='../2006_smoking_status')]
+                                              data_dir='../2006_smoking_status'),
+                       datasets.BuilderConfig(name='cohort_selection_challenge', version=VERSION,
+                                              description="2018 Task 1 cohort selection",
+                                              data_dir='../2018_cohort_selection')
+                       ]
     DEFAULT_CONFIG_NAME = 'language_model'
 
     def _info(self):
@@ -72,6 +81,14 @@ class N2c2Dataset(datasets.GeneratorBasedBuilder):
                     "note": datasets.Value("string"),
                     "id": datasets.Value("string"),
                     "label": datasets.ClassLabel(5)
+                }
+            )
+        elif self.config.name == 'cohort_selection_challenge':
+            features = datasets.Features(
+                {
+                    "note": datasets.Value("string"),
+                    "id": datasets.Value("string"),
+                    "label": {tag: datasets.features.ClassLabel(names=["not met", "met"]) for tag in _COHORT_TAGS}
                 }
             )
         else:
@@ -140,6 +157,14 @@ class N2c2Dataset(datasets.GeneratorBasedBuilder):
                             "note": row[-1],
                             "id": str(row[0]),
                             "label": _SMOKING_LABELS[str(row[1])]
+                        }
+                elif self.config.name == "cohort_selection_challenge":
+                    if len(row) > 0:
+                        tag_lab = {el.split('::')[0]: el.split('::')[1] for el in row[1:-1]}
+                        yield id_, {
+                            "note": row[-1],
+                            "id": str(row[0]),
+                            "label": tag_lab
                         }
                 else:
                     pass
