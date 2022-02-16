@@ -88,7 +88,9 @@ class N2c2Dataset(datasets.GeneratorBasedBuilder):
                 {
                     "note": datasets.Value("string"),
                     "id": datasets.Value("string"),
-                    "label": {tag: datasets.features.ClassLabel(names=["not met", "met"]) for tag in _COHORT_TAGS}
+                    "label_MET": {tag: datasets.features.ClassLabel(names=["not met", "met"]) for tag in _COHORT_TAGS},
+                    "label_NOTMET": {tag: datasets.features.ClassLabel(names=["met", "not met"]) for tag in
+                                     _COHORT_TAGS}
                 }
             )
         else:
@@ -164,7 +166,8 @@ class N2c2Dataset(datasets.GeneratorBasedBuilder):
                         yield id_, {
                             "note": row[-1],
                             "id": str(row[0]),
-                            "label": tag_lab
+                            "label_MET": tag_lab,
+                            "label_NOTMET": tag_lab
                         }
                 else:
                     pass
