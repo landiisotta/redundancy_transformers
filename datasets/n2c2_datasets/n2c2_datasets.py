@@ -147,21 +147,19 @@ class N2c2Dataset(datasets.GeneratorBasedBuilder):
                         }
                     else:
                         continue
-                if self.config.name == 'r_language_model':
-                    if len(row) > 0:
-                        yield id_, {
-                            "sentence": row[-1],
-                            "document": str(row[0]),
-                            "challenge": str(row[1]),
-                        }
-                    else:
-                        continue
                 elif self.config.name == "smoking_challenge":
                     if len(row) > 0:
                         yield id_, {
                             "note": row[-1],
                             "id": str(row[0]),
                             "label": _SMOKING_LABELS[str(row[1])]
+                        }
+                elif self.config.name == 'r_language_model':
+                    if len(row) > 0:
+                        yield id_, {
+                            "sentence": row[-1],
+                            "document": str(row[0]),
+                            "challenge": str(row[1]),
                         }
                 else:
                     pass
