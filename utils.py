@@ -1,13 +1,16 @@
 # n2c2 challenge datasets folder names
-chll = ['smoking', 'obesity',
-        'med_extraction', 'cpt_extraction',
-        'temp_rel', 'long',
+chll = ['smoking',
+        'obesity',
+        'med_extraction',
+        'cpt_extraction',
+        'temp_rel',
+        'long',
         'med_extraction_tsk2']
 
 FOLDER = {'language_model': './datasets/n2c2_datasets',
            'smoking_challenge': './datasets/2006_smoking_status'}
 
-# Folders where files are stores. Sub folder and file names were preserved.
+# Folders where files are stored. Sub folder and file names were preserved.
 # Main folder names were changed
 train_files = {'smoking': '/2006_smoking_status',
                'obesity': '/2008_obesity',

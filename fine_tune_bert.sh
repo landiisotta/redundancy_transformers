@@ -5,7 +5,7 @@
 #BSUB -n 48
 #BSUB -W 144:00
 #BSUB -R a100
-#BSUB -R rusage[mem=12000,ngpus_excl_p=4]
+#BSUB -R rusage[mem=24000,ngpus_excl_p=4]
 #BSUB -o %J.stdout
 #BSUB -eo %J.stderr
 #BSUB -L /bin/bash
@@ -30,7 +30,7 @@ python -m fine_tune_bert \
   --epochs=$EPOCHS \
   --batch_size=$BATCH_SIZE \
   --learning_rate=$LEARNING_RATE \
-  --num_training_steps=3200 \
-  --num_warmup_step=32 \
-  --patience=9 \
+  --num_training_steps=6400 \
+  --num_warmup_step=256 \
+  --patience=49 \
   --dev

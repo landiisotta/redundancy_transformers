@@ -24,7 +24,8 @@ _DESCRIPTION = """\
 Create n2c2 datasets from different challenges for clinical notes redundancy investigation.
 Configurations: (1) language_model: pretrained ClinicalBert fine-tuning on MLM and NSP tasks;
 (2) smoking_challenge: create dataset to fine-tune ClinicalBERT on the 2006 smoking challenge;
-(3) r_language_model: create dataset with redundant synthetic notes to fine-tune ClinicalBERT;
+(3) cohort_selection_challenge: 
+(4) r_language_model: create dataset with redundant synthetic notes to fine-tune ClinicalBERT;
 """
 
 # Link to the official homepage
@@ -33,9 +34,11 @@ _HOMEPAGE = "https://portal.dbmi.hms.harvard.edu/projects/n2c2-nlp/"
 # Uncomment the following line to load the dummy version of the data (e.g., for code debugging)
 # _FOLDER = {'language_model': './datasets/n2c2_datasets/dummy/language_model/0.0.1/dummy_data',
 #            'smoking_challenge': './datasets/2006_smoking_status/dummy/smoking_challenge/0.0.1/dummy_data',
+#            'cohort_selection_challenge': './datasets/2018_cohort_selection/dummy/cohort_selection_challenge/0.0.1/dummy_data',
 #            'r_language_model': './datasets/n2c2_datasets/synthetic_n2c2_datasets/dummy/r_language_model/0.0.1/dummy_data'}
 _FOLDER = {'language_model': './datasets/n2c2_datasets',
            'smoking_challenge': './datasets/2006_smoking_status',
+           'cohort_selection_challenge': './datasets/2018_cohort_selection',
            'r_language_model': './datasets/n2c2_datasets/synthetic_n2c2_datasets'}
 
 _SMOKING_LABELS = {'NON-SMOKER': 0,
@@ -43,6 +46,9 @@ _SMOKING_LABELS = {'NON-SMOKER': 0,
                    'SMOKER': 2,
                    'PAST SMOKER': 3,
                    'UNKNOWN': 4}
+
+_COHORT_TAGS = ["ABDOMINAL", "ADVANCED-CAD", "ALCOHOL-ABUSE", "ASP-FOR-MI", "CREATININE", "DIETSUPP-2MOS", "DRUG-ABUSE",
+                "ENGLISH", "HBA1C", "KETO-1YR", "MAJOR-DIABETES", "MAKES-DECISIONS", "MI-6MOS"]
 
 
 class N2c2Dataset(datasets.GeneratorBasedBuilder):
@@ -55,6 +61,9 @@ class N2c2Dataset(datasets.GeneratorBasedBuilder):
                        datasets.BuilderConfig(name='smoking_challenge', version=VERSION,
                                               description="2006 smoking status challenge",
                                               data_dir='../2006_smoking_status'),
+                       datasets.BuilderConfig(name='cohort_selection_challenge', version=VERSION,
+                                              description="2018 Task 1 cohort selection",
+                                              data_dir='../2018_cohort_selection'),
                        datasets.BuilderConfig(name='r_language_model', version=VERSION,
                                               description="ClinicalBERT fine-tuning redundant dataset",
                                               data_dir='./synthetic_n2c2_datasets')]
@@ -78,6 +87,16 @@ class N2c2Dataset(datasets.GeneratorBasedBuilder):
                     "note": datasets.Value("string"),
                     "id": datasets.Value("string"),
                     "label": datasets.ClassLabel(5)
+                }
+            )
+        elif self.config.name == 'cohort_selection_challenge':
+            features = datasets.Features(
+                {
+                    "note": datasets.Value("string"),
+                    "id": datasets.Value("string"),
+                    "label_MET": {tag: datasets.features.ClassLabel(names=["not met", "met"]) for tag in _COHORT_TAGS},
+                    "label_NOTMET": {tag: datasets.features.ClassLabel(names=["met", "not met"]) for tag in
+                                     _COHORT_TAGS}
                 }
             )
         elif self.config.name == 'r_language_model':
@@ -154,6 +173,15 @@ class N2c2Dataset(datasets.GeneratorBasedBuilder):
                             "note": row[-1],
                             "id": str(row[0]),
                             "label": _SMOKING_LABELS[str(row[1])]
+                        }
+                elif self.config.name == "cohort_selection_challenge":
+                    if len(row) > 0:
+                        tag_lab = {el.split('::')[0]: el.split('::')[1] for el in row[1:-1]}
+                        yield id_, {
+                            "note": row[-1],
+                            "id": str(row[0]),
+                            "label_MET": tag_lab,
+                            "label_NOTMET": tag_lab
                         }
                 elif self.config.name == 'r_language_model':
                     if len(row) > 0:
