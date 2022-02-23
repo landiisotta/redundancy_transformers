@@ -32,7 +32,8 @@ _HOMEPAGE = "https://portal.dbmi.hms.harvard.edu/projects/n2c2-nlp/"
 
 # Uncomment the following line to load the dummy version of the data (e.g., for code debugging)
 # _FOLDER = {'language_model': './datasets/n2c2_datasets/dummy/language_model/0.0.1/dummy_data',
-#            'smoking_challenge': './datasets/2006_smoking_status/dummy/smoking_challenge/0.0.1/dummy_data'}
+#            'smoking_challenge': './datasets/2006_smoking_status/dummy/smoking_challenge/0.0.1/dummy_data',
+#            'r_language_model': './datasets/n2c2_datasets/synthetic_n2c2_datasets/dummy/r_language_model/0.0.1/dummy_data'}
 _FOLDER = {'language_model': './datasets/n2c2_datasets',
            'smoking_challenge': './datasets/2006_smoking_status',
            'r_language_model': './datasets/n2c2_datasets/synthetic_n2c2_datasets'}
@@ -115,7 +116,7 @@ class N2c2Dataset(datasets.GeneratorBasedBuilder):
                 name=datasets.Split.TRAIN,
                 # These kwargs will be passed to _generate_examples
                 gen_kwargs={
-                    "filepath": os.path.join(data_dir, 'synthetic_train_sentences.txt'),
+                    "filepath": os.path.join(data_dir, 'train_sentences.txt'),  # needs to be updated to synthetic
                     "split": "train",
                 },
             ),
