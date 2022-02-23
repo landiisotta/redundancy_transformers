@@ -11,6 +11,7 @@ import os
 from tqdm import tqdm
 import time
 
+
 MaskedLmInstance = namedtuple("MaskedLmInstance",
                               ["index", "label"])
 
