@@ -19,7 +19,7 @@ def create_synthetic_note(sent_add, words_replace):
     """
     seed1 = numpy.random.RandomState(40)
     seed2 = random.Random(40)
-    file_name = '/Users/alissavalentine/Charney rotation/project code/input/train_sentences.txt'
+    file_name = '/Users/alissavalentine/Charney_rotation/rotation_project_code/input/train_sentences.txt'
     train_file = open(file_name)
     vocab = create_vocab_set(train_file)
     train_file = open(file_name)
@@ -28,7 +28,7 @@ def create_synthetic_note(sent_add, words_replace):
     train_file = open(file_name)
     new_notes, md_words, md_sentences = repeat_notes(train_file, sent_add, words_replace, vocab, weights, sentences)
 
-    outdir = "/Users/alissavalentine/Charney rotation/project code/output"
+    outdir = "/Users/alissavalentine/Charney_rotation/rotation_project_code/output"
     os.chdir(outdir)
 
     synthetic_file = open("synthetic_notes.txt", "w")

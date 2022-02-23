@@ -347,10 +347,14 @@ if __name__ == '__main__':
                         type=int,
                         dest='random_seed',
                         help='Random seed')
+    parser.add_argument('--config_dataset',
+                        type=str,
+                        dest='config_dataset',
+                        help='Dataset configuration')
     config = parser.parse_args(sys.argv[1:])
 
     start = time.time()
-    dt = load_dataset(os.path.join('./datasets', config.dataset_name))
+    dt = load_dataset(os.path.join('./datasets', config.dataset_name), name=config.config_dataset)
 
     tokenizer = AutoTokenizer.from_pretrained(ut.checkpoint)
 

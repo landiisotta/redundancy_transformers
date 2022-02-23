@@ -10,7 +10,7 @@ chll = ['smoking',
 FOLDER = {'language_model': './datasets/n2c2_datasets',
            'smoking_challenge': './datasets/2006_smoking_status'}
 
-# Folders where files are stores. Sub folder and file names were preserved.
+# Folders where files are stored. Sub folder and file names were preserved.
 # Main folder names were changed
 train_files = {'smoking': '/2006_smoking_status',
                'obesity': '/2008_obesity',
