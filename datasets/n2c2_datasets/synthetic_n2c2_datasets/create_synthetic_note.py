@@ -12,26 +12,22 @@ import os
 import sys
 
 
-def create_synthetic_note(sent_add, words_replace):
+def create_synthetic_note(sent_add, words_replace, training_file_name):
     """
     End function
     :return: 3 files: 1) synthetic notes, 2) vocab meta data, 3) sentence meta data
     """
     seed1 = numpy.random.RandomState(40)
     seed2 = random.Random(40)
-    file_name = '/Users/alissavalentine/Charney rotation/project code/input/train_sentences.txt'
-    train_file = open(file_name)
+    train_file = open(training_file_name)
     vocab = create_vocab_set(train_file)
-    train_file = open(file_name)
+    train_file = open(training_file_name)
     sentences = create_s_dictionary(train_file)
     weights = create_weights(vocab, sentences)
-    train_file = open(file_name)
+    train_file = open(training_file_name)
     new_notes, md_words, md_sentences = repeat_notes(train_file, sent_add, words_replace, vocab, weights, sentences)
 
-    outdir = "/Users/alissavalentine/Charney rotation/project code/output"
-    os.chdir(outdir)
-
-    synthetic_file = open("synthetic_notes.txt", "w")
+    synthetic_file = open(output_notes, "w")
     with synthetic_file as file:
         for note in new_notes:
             for line in note:
@@ -39,7 +35,7 @@ def create_synthetic_note(sent_add, words_replace):
                 file.writelines("\n")
     synthetic_file.close()
 
-    word_md_file = open("word_metadata.txt", "w")
+    word_md_file = open(output_word_metadata, "w")
     with word_md_file as file:
         file.writelines("note_id,old_word_index,old_word_chr,new_word_chr,sentence_index,old_word,new_word\n")
         for note_changes in md_words:
@@ -48,7 +44,7 @@ def create_synthetic_note(sent_add, words_replace):
                 file.writelines("\n")
     word_md_file.close()
 
-    sentence_md_file = open("sentence_metadata.txt", "w")
+    sentence_md_file = open(output_sent_metadata, "w")
     with sentence_md_file as file:
         file.writelines("note_id,old_sent_count,new_sent_count,"
                         "sent_source_note_id,sent_source_index\n")
@@ -84,4 +80,10 @@ if __name__ == '__main__':
                         default=50)
     # parsing arguments
     args = parser.parse_args()
-    create_synthetic_note(args.s_add, args.w_replace)
+    file_name = '/Users/alissavalentine/Charney_rotation/redundancy_transformers/datasets/n2c2_datasets/' \
+                'synthetic_n2c2_datasets/train_sentences.txt'
+    output_notes = "synthetic_notes.txt"
+    output_word_metadata = "word_metadata.txt"
+    output_sent_metadata = "sentence_metadata.txt"
+    create_synthetic_note(args.s_add, args.w_replace, file_name)
+
