@@ -12,26 +12,23 @@ import os
 import sys
 
 
-def create_synthetic_note(sent_add, words_replace):
+def create_synthetic_note(sent_add, words_replace, training_file_name,
+                          notes_output_file, words_output_file, sent_output_file):
     """
     End function
     :return: 3 files: 1) synthetic notes, 2) vocab meta data, 3) sentence meta data
     """
     seed1 = numpy.random.RandomState(40)
     seed2 = random.Random(40)
-    file_name = '/Users/alissavalentine/Charney rotation/project code/input/train_sentences.txt'
-    train_file = open(file_name)
+    train_file = open(training_file_name)
     vocab = create_vocab_set(train_file)
-    train_file = open(file_name)
+    train_file = open(training_file_name)
     sentences = create_s_dictionary(train_file)
     weights = create_weights(vocab, sentences)
-    train_file = open(file_name)
+    train_file = open(training_file_name)
     new_notes, md_words, md_sentences = repeat_notes(train_file, sent_add, words_replace, vocab, weights, sentences)
 
-    outdir = "/Users/alissavalentine/Charney rotation/project code/output"
-    os.chdir(outdir)
-
-    synthetic_file = open("synthetic_notes.txt", "w")
+    synthetic_file = open(notes_output_file, "w")
     with synthetic_file as file:
         for note in new_notes:
             for line in note:
@@ -39,7 +36,7 @@ def create_synthetic_note(sent_add, words_replace):
                 file.writelines("\n")
     synthetic_file.close()
 
-    word_md_file = open("word_metadata.txt", "w")
+    word_md_file = open(words_output_file, "w")
     with word_md_file as file:
         file.writelines("note_id,old_word_index,old_word_chr,new_word_chr,sentence_index,old_word,new_word\n")
         for note_changes in md_words:
@@ -48,7 +45,7 @@ def create_synthetic_note(sent_add, words_replace):
                 file.writelines("\n")
     word_md_file.close()
 
-    sentence_md_file = open("sentence_metadata.txt", "w")
+    sentence_md_file = open(sent_output_file, "w")
     with sentence_md_file as file:
         file.writelines("note_id,old_sent_count,new_sent_count,"
                         "sent_source_note_id,sent_source_index\n")
@@ -70,18 +67,36 @@ if __name__ == '__main__':
                         help='# sentences added',
                         required=False,
                         default=2)
-    # parser.add_argument('-n', 'note',
-    #                     dest='n_repeat',
-    #                     type=int,
-    #                     help='# notes repeated',
-    #                     required=False,
-    #                     default=2)
     parser.add_argument('--w', '--word',
                         dest='w_replace',
                         type=int,
                         help='% words replaced',
                         required=False,
                         default=50)
+    parser.add_argument('--input_file',
+                        dest='input_file',
+                        type=str,
+                        help='name of training file',
+                        required=True)
+    parser.add_argument('--output_file',
+                        dest='output_notes',
+                        type=str,
+                        help='name of output notes file',
+                        required=True,
+                        default='synthetic_notes.txt')
+    parser.add_argument('--output_word_metadata_file',
+                        dest='output_word_metadata',
+                        type=str,
+                        help='name of output word metadata file',
+                        required=True,
+                        default='word_metadata.txt')
+    parser.add_argument('--output_sent_metadata_file',
+                        dest='output_sent_metadata',
+                        type=str,
+                        help='name of output sentence metadata file',
+                        required=True,
+                        default='sentence_metadata.txt')
     # parsing arguments
     args = parser.parse_args()
-    create_synthetic_note(args.s_add, args.w_replace)
+    create_synthetic_note(args.s_add, args.w_replace, args.input_file,
+                          args.output_notes, args.output_word_metadata, args.output_sent_metadata)
