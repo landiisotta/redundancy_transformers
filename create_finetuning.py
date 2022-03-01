@@ -1,5 +1,4 @@
 from datasets import load_dataset, DatasetDict, Dataset
-import random
 import utils as ut
 from transformers import AutoTokenizer
 import sys
@@ -10,6 +9,12 @@ from collections import OrderedDict
 import time
 from sklearn.model_selection import train_test_split
 import numpy as np
+
+# Labels for the cohort selection task
+_COHORT_TAGS = ["ABDOMINAL", "ADVANCED-CAD", "ALCOHOL-ABUSE",
+                "ASP-FOR-MI", "CREATININE", "DIETSUPP-2MOS",
+                "DRUG-ABUSE", "ENGLISH", "HBA1C", "KETO-1YR",
+                "MAJOR-DIABETES", "MAKES-DECISIONS", "MI-6MOS"]
 
 
 def create_note_classification_dataset(dataset,
@@ -59,6 +64,7 @@ def create_note_classification_dataset(dataset,
                     attention_mask.append(0)
             # features.setdefault('labels', list()).append([el['label']])
             # features.setdefault('id', list()).append([el['id']])
+
         features.setdefault('labels', list()).append([el['label']] * len(input_ids))
         features.setdefault('id', list()).append([el['id']] * len(input_ids))
         features.setdefault('tokenized_note', list()).append(ovrlp)
@@ -92,12 +98,19 @@ def _create_overlap_with_padding(tkn_note, max_seq_len, window_size):
     return ovrlp
 
 
-def _create_train_val_split(training, val_size, random_seed):
+def _create_train_val_split(training, val_size, random_seed, challenge):
     note_ids = [np.unique(ids)[0] for ids in training['id']]
-    labels = [np.unique(lab)[0] for lab in training['labels']]
 
-    tr_ids, val_ids = train_test_split(note_ids, stratify=labels, test_size=val_size,
-                                       random_state=random_seed, shuffle=True)
+    if challenge == 'smoking_challenge':
+        labels = [np.unique(lab)[0] for lab in training['labels']]
+    else:
+        labels = None
+
+    tr_ids, val_ids = train_test_split(note_ids,
+                                       stratify=labels,
+                                       test_size=val_size,
+                                       random_state=random_seed,
+                                       shuffle=True)
     train, val = OrderedDict(), OrderedDict()
     for el in training:
         idx = np.unique(el['id'])[0]
@@ -107,6 +120,11 @@ def _create_train_val_split(training, val_size, random_seed):
             else:
                 val.setdefault(k, list()).append(el[k])
     return Dataset.from_dict(train), Dataset.from_dict(val)
+
+
+def _label_dict_to_list(example):
+    example['label'] = list(example['label'].values())
+    return example
 
 
 if __name__ == '__main__':
@@ -157,10 +175,31 @@ if __name__ == '__main__':
         if config.create_val:
             chll_dt['train'], chll_dt['validation'] = _create_train_val_split(chll_dt['train'],
                                                                               config.create_val,
-                                                                              config.random_seed)
+                                                                              config.random_seed,
+                                                                              config.challenge)
         pkl.dump(DatasetDict(chll_dt),
                  open(os.path.join('./datasets', config.output_folder,
                                    f"{config.challenge}_task_dataset_"
                                    f"maxlen{config.max_seq_length}ws{config.window_size}.pkl"),
                       'wb'))
+    elif config.challenge == 'cohort_selection_challenge':
+        for label in ['met', 'notmet']:
+            for split in dt.keys():
+                dt[split] = dt[split].rename_column(f'label_{label.upper()}', 'label')
+                dt[split] = dt[split].map(_label_dict_to_list)
+                chll_dt[split] = create_note_classification_dataset(dataset=dt[split],
+                                                                    tokenizer=tokenizer,
+                                                                    max_seq_length=config.max_seq_length,
+                                                                    window_size=config.window_size)
+                dt[split] = dt[split].rename_column('label', f'label_{label.upper()}')
+            if config.create_val:
+                chll_dt['train'], chll_dt['validation'] = _create_train_val_split(chll_dt['train'],
+                                                                                  config.create_val,
+                                                                                  config.random_seed,
+                                                                                  config.challenge)
+            pkl.dump(DatasetDict(chll_dt),
+                     open(os.path.join('./datasets', config.output_folder,
+                                       f"{config.challenge}_task_dataset_{label.upper()}_"
+                                       f"maxlen{config.max_seq_length}ws{config.window_size}.pkl"),
+                          'wb'))
     print(f"Task ended in {round(time.process_time() - start, 2)}s")

@@ -13,6 +13,7 @@ import metrics
 import time
 import csv
 import os
+from models.multilabel_bert import MultiLabelBertTask
 
 DEVICE = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
 GPUS = max(torch.cuda.device_count(), 1)
@@ -27,7 +28,8 @@ def training(train_set,
              optimizer,
              lr_scheduler,
              batches,
-             weighting):
+             weighting,
+             challenge):
     """
     Training/validation step.
 
@@ -38,17 +40,18 @@ def training(train_set,
     :param lr_scheduler:
     :param batches:
     :param weighting:
+    :param challenge:
     :return: training and validation loss
     """
     # Training
     model.train()
     loss_batches = 0
-    train_metrics = metrics.TaskMetrics(challenge='smoking_challenge')
+    train_metrics = metrics.TaskMetrics(challenge=challenge)
     for batch in train_set:
         batch = {k: v.to(DEVICE) for k, v in batch.items()}
         outputs = model(**batch)
 
-        wloss, _ = _compute_wloss(batch, outputs, batches, weighting)
+        wloss, _ = _compute_wloss(batch, outputs, batches, weighting, challenge=challenge)
         wloss.sum().backward()
         optimizer.step()
         lr_scheduler.step()
@@ -72,22 +75,30 @@ def training(train_set,
         with torch.no_grad():
             outputs = model(**batch)
 
-        val_loss, output_logits = _compute_wloss(batch, outputs, batches, weighting)
+        val_loss, output = _compute_wloss(batch, outputs, batches, weighting, challenge)
 
         if weighting:
             loss_batches_eval += val_loss.sum().item()
             train_metrics.add_batch(batch['labels'][0].item(),
-                                    torch.argmax(output_logits).item())
+                                    torch.argmax(output).item())
         else:
             if batches:
                 loss_batches_eval += val_loss.sum().item() * batch['input_ids'].shape[0]
                 # extend
-                train_metrics.add_batch(batch['labels'].view(-1).tolist(),
-                                        torch.argmax(outputs.logits, dim=-1).tolist())
+                if challenge == 'smoking_challenge':
+                    train_metrics.add_batch(batch['labels'].view(-1).tolist(),
+                                            torch.argmax(outputs.logits, dim=-1).tolist())
+                elif challenge == 'cohort_selection_challenge':
+                    train_metrics.add_batch(batch['labels'].tolist(),
+                                            _get_labels(output))
             else:
                 loss_batches_eval += val_loss.sum().item()
-                train_metrics.add_batch(batch['labels'][0].item(),
-                                        torch.argmax(output_logits).item())
+                if challenge == 'smoking_challenge':
+                    train_metrics.add_batch(batch['labels'][0].item(),
+                                            torch.argmax(output).item())
+                elif challenge == 'cohort_selection_challenge':
+                    train_metrics.add_batch([batch['labels'][0].tolist()],
+                                            _get_labels(output))
 
     return loss_batches / (len(train_set.sampler) * GPUS), loss_batches_eval / (
             len(dev_set.sampler) * GPUS), train_metrics.compute()
@@ -106,8 +117,13 @@ def _collate_fn(batch):
     """
     input_ids = batch['input_ids']
     labels = batch['labels']
-    return {'input_ids': torch.tensor(input_ids),
-            'labels': torch.tensor([[lab] for lab in labels])}
+    # Added multi-label case
+    if isinstance(labels[0], list):
+        return {'input_ids': torch.tensor(input_ids),
+                'labels': torch.tensor(labels)}
+    else:
+        return {'input_ids': torch.tensor(input_ids),
+                'labels': torch.tensor([[lab] for lab in labels])}
 
 
 def _collate_fn_batch(batch):
@@ -118,11 +134,16 @@ def _collate_fn_batch(batch):
     for b in batch:
         input_ids.append(b['input_ids'][0])
         labels.append(b['labels'][0])
-    return {'input_ids': torch.tensor(input_ids),
-            'labels': torch.tensor([[lab] for lab in labels])}
+    # Added multi-label case
+    if isinstance(labels[0], list):
+        return {'input_ids': torch.tensor(input_ids),
+                'labels': torch.tensor([lab for lab in labels])}
+    else:
+        return {'input_ids': torch.tensor(input_ids),
+                'labels': torch.tensor([[lab] for lab in labels])}
 
 
-def _compute_wloss(batch, outputs, batches, weighting_method):
+def _compute_wloss(batch, outputs, batches, weighting_method, challenge):
     """
     If weighting method is enabled: compute loss of overlapping note chunks weighting more the initial vectors;
      Otherwise: return batched loss.
@@ -139,18 +160,34 @@ def _compute_wloss(batch, outputs, batches, weighting_method):
 
         wloss = nn.functional.cross_entropy(torch.matmul(weights, outputs.logits),
                                             batch['labels'][0].view(-1))
-        output_logits = torch.matmul(weights, outputs.logits)
+        output = torch.matmul(weights, outputs.logits)
     else:
         if batches:
-            wloss = outputs.loss
-            output_logits = outputs.logits
+            if challenge == 'smoking_challenge':
+                wloss = outputs.loss
+                output = outputs.logits
+            elif challenge == 'cohort_selection_challenge':
+                wloss = nn.functional.binary_cross_entropy(outputs, batch['labels'].float())
+                output = outputs
+            else:
+                output, wloss = None, None
         else:
-            weights = torch.tensor(np.array([[1] * batch['labels'].shape[0]]), device=DEVICE).double()
-            wloss = nn.functional.cross_entropy(torch.matmul(weights, outputs.logits),
-                                                batch['labels'][0].view(-1))
-            output_logits = torch.matmul(weights, outputs.logits)
+            if challenge == 'smoking_challenge':
+                weights = torch.tensor(np.array([[1] * batch['labels'].shape[0]]), device=DEVICE).double()
+                wloss = nn.functional.cross_entropy(torch.matmul(weights, outputs.logits),
+                                                    batch['labels'][0].view(-1))
+                output = torch.matmul(weights, outputs.logits)
+            elif challenge == 'cohort_selection_challenge':
+                output = torch.max(outputs, dim=0).values.view(1, -1)
+                wloss = nn.functional.binary_cross_entropy(output,
+                                                           batch['labels'][0].view(1, -1).float())
+            else:
+                output, wloss = None, None
+    return wloss, output
 
-    return wloss, output_logits
+
+def _get_labels(out_sigmoids, threshold=0.5):
+    return np.array(out_sigmoids > threshold, dtype=int).tolist()
 
 
 if __name__ == '__main__':
@@ -173,13 +210,18 @@ if __name__ == '__main__':
                         dest='learning_rate')  # 5e-5
     parser.add_argument('--n_classes',
                         type=int,
-                        help='Number of classes',
+                        help='Number of classes or number of labels for '
+                             'the multi-label binary classification task',
                         dest='n_classes')
     parser.add_argument('--batch_size',
                         type=int,
                         help='If non-overlapping notes N batches',
                         dest='batch_size',
                         default=None)
+    parser.add_argument('--challenge',
+                        type=str,
+                        help='Challenge name',
+                        dest='challenge')
     parser.add_argument('--weighting',
                         help='Enabling weighting strategy for overlapping note chunks',
                         dest='weighting',
@@ -196,17 +238,32 @@ if __name__ == '__main__':
 
     config = parser.parse_args(sys.argv[1:])
 
-    writer_train = SummaryWriter(f'./runs/BERT-task-smoking/tensorboard/train/{config.learning_rate}')
-    writer_val = SummaryWriter(f'./runs/BERT-task-smoking/tensorboard/validation/{config.learning_rate}')
-    writer_test = SummaryWriter(f'./runs/BERT-task-smoking/tensorboard/test/{config.learning_rate}')
+    if config.challenge == 'cohort_selection_challenge' and config.weighting:
+        print("Incompatible commands, cannot fine-tune cohort selection challenge with weighting method.")
+        print("Exiting main...")
+        sys.exit()
 
-    model = AutoModelForSequenceClassification.from_pretrained(config.checkpoint,
-                                                               num_labels=config.n_classes)
-    model = model.double()
+    writer_train = SummaryWriter(f'./runs/BERT-task-{config.challenge}/tensorboard/train/{config.learning_rate}')
+    writer_val = SummaryWriter(f'./runs/BERT-task-{config.challenge}/tensorboard/validation/{config.learning_rate}')
+    writer_test = SummaryWriter(f'./runs/BERT-task-{config.challenge}/tensorboard/test/{config.learning_rate}')
 
-    data = pkl.load(open(config.dataset, 'rb'))
+    if config.challenge == 'smoking_challenge':
+        model = AutoModelForSequenceClassification.from_pretrained(config.checkpoint,
+                                                                   num_labels=config.n_classes)
+        model = model.double()
+    elif config.challenge == 'cohort_selection_challenge':
+        model = MultiLabelBertTask(checkpoint=config.checkpoint,
+                                   labels=config.n_classes)
+    else:
+        sys.exit()
+
     ws = config.dataset.split('ws')[-1].split('.')[0]
     seqlen = config.dataset.split('maxlen')[-1].split('ws')[0]
+    if config.challenge == 'cohort_selection_challenge':
+        class_label = config.dataset.split('_')[-2]
+    else:
+        class_label = None
+    data = pkl.load(open(config.dataset, 'rb'))
 
     train, val, test = data['train'], data['validation'], data['test']
 
@@ -281,11 +338,16 @@ if __name__ == '__main__':
         model = nn.DataParallel(model)
 
     val_split = round(val.num_rows / train.num_rows, 1)
-    if not os.path.isdir('./runs/BERT-task-smoking/experiments'):
-        os.makedirs('./runs/BERT-task-smoking/experiments')
-    metrics_file = open(os.path.join('./runs/BERT-task-smoking/experiments/',
-                                     f'metrics_valsplit{val_split}lr{config.learning_rate}ws{ws}seqlen{seqlen}batch'
-                                     f'{config.batch_size}weights{config.weighting}.csv'), 'w')
+    if not os.path.isdir(f'./runs/BERT-task-{config.challenge}/experiments'):
+        os.makedirs(f'./runs/BERT-task-{config.challenge}/experiments')
+    if config.challenge == 'cohort_selection_challenge':
+        metrics_file = open(os.path.join(f'./runs/BERT-task-{config.challenge}/experiments/',
+                                         f'metrics_valsplit{val_split}lr{config.learning_rate}ws{ws}seqlen{seqlen}batch'
+                                         f'{config.batch_size}weights{config.weighting}_{class_label}.csv'), 'w')
+    else:
+        metrics_file = open(os.path.join(f'./runs/BERT-task-{config.challenge}/experiments/',
+                                         f'metrics_valsplit{val_split}lr{config.learning_rate}ws{ws}seqlen{seqlen}batch'
+                                         f'{config.batch_size}weights{config.weighting}.csv'), 'w')
     wr = csv.writer(metrics_file)
     colnames = ['learning_rate', 'val_split', 'window_size', 'sequence_length', 'batch_size', 'weighting_enabled',
                 'epoch', 'tr_loss', 'val_loss'] + ['f1_micro', 'f1_macro'] + \
@@ -304,7 +366,8 @@ if __name__ == '__main__':
                                                   optimizer,
                                                   lr_scheduler,
                                                   config.batch_size,
-                                                  config.weighting)
+                                                  config.weighting,
+                                                  config.challenge)
         line = fixed_info + [epoch, tr_loss, val_loss]
         writer_train.add_scalar('epoch_loss', tr_loss, epoch)
         writer_val.add_scalar('epoch_loss', val_loss, epoch)
@@ -322,39 +385,48 @@ if __name__ == '__main__':
                 for kk, val in val_metrics[k].items():
                     print(f"{kk}: {val}")
                 print('\n')
-                # Save checkpoint
+            # Save checkpoint
             torch.save({
                 'epoch': epoch,
                 'model_state_dict': model.state_dict(),
                 'optimizer_state_dict': optimizer.state_dict(),
-                'loss': tr_loss}, f'./runs/BERT-task-smoking/checkpoint.pt')
+                'loss': tr_loss}, f'./runs/BERT-task-{config.challenge}/checkpoint.pt')
         wr.writerow(line)
     # Test
     line = fixed_info + ['', '', '']
     model.eval()
-    test_metrics = metrics.TaskMetrics(challenge='smoking_challenge')
+    test_metrics = metrics.TaskMetrics(challenge=config.challenge)
     test_loss = 0
     for test_batch in test_loader:
         test_batch = {k: v.to(DEVICE) for k, v in test_batch.items()}
         with torch.no_grad():
             outputs = model(**test_batch)
 
-        wloss, output_logits = _compute_wloss(test_batch,
-                                              outputs,
-                                              config.batch_size,
-                                              weighting_method=config.weighting)
+        wloss, output = _compute_wloss(test_batch,
+                                       outputs,
+                                       config.batch_size,
+                                       weighting_method=config.weighting,
+                                       challenge=config.challenge)
         if config.weighting:
-            test_metrics.add_batch(test_batch['labels'][0].item(), torch.argmax(output_logits).item())
+            test_metrics.add_batch(test_batch['labels'][0].item(), torch.argmax(output).item())
             test_loss += wloss.sum().item()
         else:
             if config.batch_size:
                 test_loss += wloss.sum().item() * test_batch['input_ids'].shape[0]
                 # extend
-                test_metrics.add_batch(test_batch['labels'].view(-1).tolist(),
-                                       torch.argmax(outputs.logits, dim=-1).tolist())
+                if config.challenge == 'smoking_challenge':
+                    test_metrics.add_batch(test_batch['labels'].view(-1).tolist(),
+                                           torch.argmax(outputs.logits, dim=-1).tolist())
+                elif config.challenge == 'cohort_selection_challenge':
+                    test_metrics.add_batch(test_batch['labels'].tolist(),
+                                           _get_labels(output))
+
             else:
-                test_metrics.add_batch(test_batch['labels'][0].item(), torch.argmax(output_logits).item())
                 test_loss += wloss.sum().item()
+                if config.challenge == 'smoking_challenge':
+                    test_metrics.add_batch(test_batch['labels'][0].item(), torch.argmax(output).item())
+                elif config.challenge == 'cohort_selection_challenge':
+                    test_metrics.add_batch([test_batch['labels'][0].tolist()], _get_labels(output))
 
     eval_metrics = test_metrics.compute()
     writer_test.add_scalar('Test loss', test_loss / (len(test_loader) * GPUS))
@@ -371,6 +443,6 @@ if __name__ == '__main__':
         for kk, val in eval_metrics[k].items():
             print(f"{kk}: {val}")
         print('\n')
-    model.module.save_pretrained('./runs/BERT-task-smoking')
+    torch.save(model.state_dict(), f'./runs/BERT-task-{config.challenge}/best_model.pt')
     print(f"Note classification task ended in: {round(time.process_time() - start, 2)}s")
     metrics_file.close()

@@ -16,8 +16,11 @@ ml python/3.8.2
 source /sc/arion/work/landii03/redundancy_a100/bin/activate
 unset PYTHONPATH
 
-DATAPATH=./datasets/2006_smoking_status/smoking_challenge_task_dataset_maxlen512ws100.pkl
+#DATAPATH=./datasets/2006_smoking_status/smoking_challenge_task_dataset_maxlen128ws5.pkl
+DATAPATH=./datasets/2018_cohort_selection/cohort_selection_challenge_task_dataset_MET_maxlen128ws5.pkl
+
 CHECKPOINT=./runs/BERT-fine-tuning
+CHALLENGENAME=cohort_selection_challenge
 EPOCHS=5
 
 python -m note_classification \
@@ -26,4 +29,5 @@ python -m note_classification \
   --epochs=$EPOCHS \
   --learning_rate=5e-5 \
   --n_classes=5 \
-  --weighting
+  --challenge=$CHALLENGENAME \
+  --no-weighting

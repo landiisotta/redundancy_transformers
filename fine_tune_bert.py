@@ -18,8 +18,6 @@ def run_finetuning(checkpoint,
                    batch_size,
                    n_epochs,
                    learning_rate,
-                   num_warmup_steps,
-                   num_training_steps,
                    patience,
                    dev=True):
     """
@@ -29,8 +27,6 @@ def run_finetuning(checkpoint,
     :param batch_size: Batch size
     :param n_epochs: Number of training epochs
     :param learning_rate: Learning rate
-    :param num_warmup_steps: Number of steps for lr decay warmup
-    :param num_training_steps: Total number of training samples to process
     :param patience: (Number of epochs - 1) before stopping
     :param dev: Whether to perform validation on dev dataset
     """
@@ -63,6 +59,10 @@ def run_finetuning(checkpoint,
                                 shuffle=False)
     else:
         val_loader = None
+
+    num_training_steps = len(train_loader) * n_epochs
+    # warmup_steps = round(num_training_steps/100)
+    warmup_steps = 0
     # Load pretrained model
     model = BertForPreTraining.from_pretrained(checkpoint)
     # Run on multiple GPUs if available
@@ -77,7 +77,7 @@ def run_finetuning(checkpoint,
                       weight_decay=0.01,
                       correct_bias=False)
     scheduler = get_polynomial_decay_schedule_with_warmup(optimizer=optimizer,
-                                                          num_warmup_steps=num_warmup_steps,
+                                                          num_warmup_steps=warmup_steps,
                                                           num_training_steps=num_training_steps,
                                                           lr_end=0.0,
                                                           power=1.0,
@@ -114,15 +114,6 @@ if __name__ == '__main__':
                         type=float,
                         dest='learning_rate',
                         help='Initial learning rate')
-    parser.add_argument('--num_warmup_steps',
-                        type=int,
-                        dest='num_warmup_steps',
-                        help='Number of warmup steps for Adam with weight decay optimizer and '
-                             'linear learning rate scheduler with warmup')
-    parser.add_argument('--num_training_steps',
-                        type=int,
-                        dest='num_training_steps',
-                        help='Total number of training steps')
     parser.add_argument('--patience',
                         type=int,
                         dest='patience',
@@ -137,8 +128,6 @@ if __name__ == '__main__':
                    n_epochs=config.n_epochs,
                    batch_size=config.batch_size,
                    learning_rate=config.learning_rate,
-                   num_training_steps=config.num_training_steps,
-                   num_warmup_steps=config.num_warmup_steps,
                    patience=config.patience,
                    dev=config.dev_set)
     print(f"Process finished in {time.time() - start}")
