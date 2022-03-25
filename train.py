@@ -3,6 +3,7 @@ from torch.utils.tensorboard import SummaryWriter
 from tqdm.auto import tqdm
 from eval import test
 import metrics
+import os
 
 DEVICE = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
 GPUS = max(torch.cuda.device_count(), 1)
@@ -43,20 +44,24 @@ def train_and_eval(train_dataloader,
                    optimizer,
                    scheduler,
                    patience,
+                   sw_redundancy='00',  # Number of sentences added and percentage of words replaced
                    n_epochs=10):
     """Run training and evaluate on dev dataset"""
-    num_steps = n_epochs * len(train_dataloader)
+    num_steps = n_epochs * len(train_dataloader.sampler)
     PROGRESS_BAR.total = num_steps
     # Save performance in Tensorboard
-    writer_train = SummaryWriter('./runs/BERT-fine-tuning/tensorboard/train')
-    writer_val = SummaryWriter('./runs/BERT-fine-tuning/tensorboard/validation')
+    writer_train = SummaryWriter(f'./runs/BERT-fine-tuning/tensorboard/train/redu{sw_redundancy}')
+    writer_val = SummaryWriter(f'./runs/BERT-fine-tuning/tensorboard/validation/redu{sw_redundancy}')
+    # Prepare folder for best model
+    best_model_dir = f'./runs/BERT-fine-tuning/redu{sw_redundancy}'
+    os.makedirs(best_model_dir, exist_ok=True)
 
     loss_history = []
-    best_dev_loss = 1e15
     c_patience = 0
     stop_training = False
     stopped_epoch = 0
     epoch_chkpt = 0
+    previous_loss = 1e15
     for epoch in range(n_epochs):
         # Train
         train_metrics, loss = train(train_dataloader, vocab_size, model, optimizer, scheduler)
@@ -64,7 +69,7 @@ def train_and_eval(train_dataloader,
         for k, val in train_metrics.items():
             writer_train.add_scalar(f'{k}', val, epoch)
         loss_history.append(loss)
-        if epoch % 10 == 0:
+        if epoch % 10 == 0 or epoch == n_epochs - 1:
             print("\n")
             print(f"Epoch: {epoch} -- Train metrics: {train_metrics}")
             print(f"Epoch {epoch} -- Train loss: {loss}")
@@ -73,30 +78,30 @@ def train_and_eval(train_dataloader,
                 'epoch': epoch,
                 'model_state_dict': model.state_dict(),
                 'optimizer_state_dict': optimizer.state_dict(),
-                'loss': loss}, f'./runs/BERT-fine-tuning/checkpoint_resume_epoch{epoch}.pt')
+                'loss': loss}, f'{best_model_dir}/checkpoint_resume_epoch{epoch}.pt')
         # Validate with early stopping if overfitting
         if dev_dataloader:
             eval_metrics, loss = test(dev_dataloader, model, vocab_size)
             current_loss = loss
-            if epoch % 10 == 0:
+            if epoch % 10 == 0 or epoch == n_epochs - 1:
                 print(f"Epoch: {epoch} -- Validation metrics: {eval_metrics}")
                 print(f"Epoch {epoch} -- Validation loss: {loss}")
-            if (current_loss - best_dev_loss) < 0:
+            if (current_loss - previous_loss) < 0:
                 c_patience = 0
-                best_dev_loss = current_loss
                 epoch_chkpt = epoch
                 torch.save(model.state_dict(),
-                           './runs/BERT-fine-tuning/checkpoint.pt')
+                           f'{best_model_dir}/checkpoint.pt')
             else:
                 if c_patience == patience:
                     writer_val.add_scalar('epoch_loss', loss, epoch)
                     for k, val in eval_metrics.items():
                         writer_val.add_scalar(f'{k}', val, epoch)
-                    model.load_state_dict(torch.load('./runs/BERT-fine-tuning/checkpoint.pt'))
+                    model.load_state_dict(torch.load(f'{best_model_dir}/checkpoint.pt'))
                     stopped_epoch = epoch
                     stop_training = True
                     break
                 c_patience += 1
+            previous_loss = current_loss
             writer_val.add_scalar('epoch_loss', loss, epoch)
             for k, val in eval_metrics.items():
                 writer_val.add_scalar(f'{k}', val, epoch)
@@ -108,8 +113,8 @@ def train_and_eval(train_dataloader,
         print(f"Metrics at early stopped epoch {epoch_chkpt}: {eval_metrics}")
         print(f"Loss at early stopped epoch {epoch_chkpt}: {loss}")
 
-    # torch.save(model.state_dict(), './runs/BERT-fine-tuning/best_model.pt')
-    model.module.save_pretrained('./runs/BERT-fine-tuning')
+    # torch.save(model.state_dict(), f'{best_model_dir}/best_model.pt')
+    model.module.save_pretrained(best_model_dir)
 
     writer_train.close()
     writer_val.close()

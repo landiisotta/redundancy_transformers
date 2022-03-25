@@ -11,6 +11,7 @@ import time
 
 # Run on GPU if available
 DEVICE = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
+CUDA_LAUNCH_BLOCKING = 1
 
 
 def run_finetuning(checkpoint,
@@ -19,6 +20,7 @@ def run_finetuning(checkpoint,
                    n_epochs,
                    learning_rate,
                    patience,
+                   sw_redundancy,
                    dev=True):
     """
     Fine-tune ClinicalBERT on MLM and NSP tasks.
@@ -28,6 +30,8 @@ def run_finetuning(checkpoint,
     :param n_epochs: Number of training epochs
     :param learning_rate: Learning rate
     :param patience: (Number of epochs - 1) before stopping
+    :param sw_redundancy: number of sentences added and percentage of words randomly replaced for
+        redundancy investigation
     :param dev: Whether to perform validation on dev dataset
     """
     torch.manual_seed(42)
@@ -60,9 +64,10 @@ def run_finetuning(checkpoint,
     else:
         val_loader = None
 
-    num_training_steps = len(train_loader) * n_epochs
-    # warmup_steps = round(num_training_steps/100)
-    warmup_steps = 0
+    num_training_steps = len(train_loader.sampler) * n_epochs
+    print(f"Number of training steps: {num_training_steps}")
+    warmup_steps = round(num_training_steps / 100)
+    # warmup_steps = 0
     # Load pretrained model
     model = BertForPreTraining.from_pretrained(checkpoint)
     # Run on multiple GPUs if available
@@ -89,7 +94,8 @@ def run_finetuning(checkpoint,
                    vocab_size=tkn_train.vocab_size,
                    optimizer=optimizer,
                    scheduler=scheduler,
-                   patience=patience)
+                   patience=patience,
+                   sw_redundancy=sw_redundancy)
 
 
 if __name__ == '__main__':
@@ -120,6 +126,11 @@ if __name__ == '__main__':
                         help='Number of epochs before early stopping.')
     parser.add_argument('--dev', dest='dev_set', action='store_true')
     parser.add_argument('--no-dev', dest='dev_set', action='store_false')
+    parser.add_argument('--sw_redundancy',
+                        dest='sw_redundancy',
+                        type=str,
+                        help='Number of sentences added to the end of the note and '
+                             'percentage of words randomly replaced for redundancy investigation.')
 
     config = parser.parse_args(sys.argv[1:])
     start = time.time()
@@ -129,5 +140,6 @@ if __name__ == '__main__':
                    batch_size=config.batch_size,
                    learning_rate=config.learning_rate,
                    patience=config.patience,
-                   dev=config.dev_set)
+                   dev=config.dev_set,
+                   sw_redundancy=config.sw_redundancy)
     print(f"Process finished in {time.time() - start}")

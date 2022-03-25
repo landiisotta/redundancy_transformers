@@ -1,15 +1,12 @@
 import torch
-from tqdm.auto import tqdm
 import metrics
 
 DEVICE = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
-GPUS = torch.cuda.device_count()
-PROGRESS_BAR = tqdm()
+GPUS = max(torch.cuda.device_count(), 1)
 
 
 def test(test_dataloader, model, vocab_size):
     """Evaluation step"""
-    PROGRESS_BAR.total = len(test_dataloader)
 
     model.eval()
 
@@ -30,7 +27,6 @@ def test(test_dataloader, model, vocab_size):
                                            nsp_labels=batch['next_sentence_label'],
                                            vocab_size=vocab_size,
                                            dev=True)
-        PROGRESS_BAR.update(1)
 
         eval_metrics.add_batch()
         loss += outputs.loss.sum().item() * batch['input_ids'].shape[0]

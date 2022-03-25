@@ -18,7 +18,8 @@ unset PYTHONPATH
 
 DATA_DIR=n2c2_datasets #modify this to be the path to the tokenized data
 MAX_SEQ_LENGTH=128
-OUTPUT_FILE=n2c2datasets_forClinicalBERTfinetuning_maxseqlen$MAX_SEQ_LENGTH.pkl
+SW_REDUNDANCY=00
+OUTPUT_FILE=n2c2datasets_forClinicalBERTfinetuning_maxseqlen$MAX_SEQ_LENGTH$SW_REDUNDANCY.pkl
 
 # Note that create_pretraining_data.py is unmodified from the script in the original BERT repo.
 # Refer to the BERT repo for the most up to date version of this code.
