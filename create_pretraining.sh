@@ -7,8 +7,8 @@
 #BSUB -R rusage[mem=4000]
 #BSUB -R span[ptile=4]
 #BSUB -o %J.stdout
-##BSUB -eo %J.stderr
-##BSUB -L /bin/bash
+#BSUB -eo %J.stderr
+#BSUB -L /bin/bash
 
 ml purge
 unset PYTHONPATH
@@ -16,10 +16,12 @@ ml python/3.8.2
 source /sc/arion/work/landii03/redundancy_a100/bin/activate
 unset PYTHONPATH
 
-DATA_DIR=n2c2_datasets #modify this to be the path to the tokenized data
+# WS_REDUNDANCY=00
+WS_REDUNDANCY=15
+DATA_DIR=n2c2_datasets/synthetic_n2c2_datasets/$WS_REDUNDANCY #modify this to be the path to the tokenized data
 MAX_SEQ_LENGTH=128
-SW_REDUNDANCY=00
-OUTPUT_FILE=n2c2datasets_forClinicalBERTfinetuning_maxseqlen$MAX_SEQ_LENGTH$SW_REDUNDANCY.pkl
+
+OUTPUT_FILE=n2c2datasets_forClinicalBERTfinetuning_maxseqlen$MAX_SEQ_LENGTH$WS_REDUNDANCY.pkl
 
 # Note that create_pretraining_data.py is unmodified from the script in the original BERT repo.
 # Refer to the BERT repo for the most up to date version of this code.

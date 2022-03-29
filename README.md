@@ -169,7 +169,7 @@ In order to generate a dummy version for each dataset configuration we can run:
 ```
 python ./datasets/n2c2_datasets/datasets_cli.py dummy_data ./datasets/n2c2_datasets \
 --auto_generate \
---n_lines=1000 \
+--n_lines=100 \
 --match_text_files='train_sentences.txt,test_sentences.txt'
 ```
 

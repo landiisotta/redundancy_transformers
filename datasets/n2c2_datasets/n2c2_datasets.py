@@ -17,6 +17,7 @@
 import csv
 import os
 import datasets
+import re
 
 # Dataset description
 _DESCRIPTION = """\
@@ -33,12 +34,18 @@ _HOMEPAGE = "https://portal.dbmi.hms.harvard.edu/projects/n2c2-nlp/"
 # Uncomment the following line to load the dummy version of the data (e.g., for code debugging)
 # _FOLDER = {'language_model': './datasets/n2c2_datasets/dummy/language_model/0.0.1/dummy_data',
 #            'smoking_challenge': './datasets/2006_smoking_status/dummy/smoking_challenge/0.0.1/dummy_data',
-#            'cohort_selection_challenge': './datasets/2018_cohort_selection/dummy/cohort_selection_challenge/0.0.1/dummy_data',
-#            'r_language_model': './datasets/n2c2_datasets/synthetic_n2c2_datasets/dummy/r_language_model/0.0.1/dummy_data'}
+#            'cohort_selection_challenge': './datasets/2018_cohort_selection/dummy/cohort_selection_challenge/0.0.1/dummy_data'}
+# for f in os.listdir('./datasets/n2c2_datasets/synthetic_n2c2_datasets'):
+#     if os.path.isdir(f) and not re.match(r'_|\.', f):
+#         _FOLDER[f'{f}r_language_model'] = f'./datasets/n2c2_datasets/synthetic_n2c2_datasets/{f}/dummy/{f}r_language_model/0.0.1/dummy_data'
+
 _FOLDER = {'language_model': './datasets/n2c2_datasets',
            'smoking_challenge': './datasets/2006_smoking_status',
-           'cohort_selection_challenge': './datasets/2018_cohort_selection',
-           'r_language_model': './datasets/n2c2_datasets/synthetic_n2c2_datasets'}
+           'cohort_selection_challenge': './datasets/2018_cohort_selection'}
+for f in os.listdir('./datasets/n2c2_datasets/synthetic_n2c2_datasets'):
+    if os.path.isdir(os.path.join('./datasets/n2c2_datasets/synthetic_n2c2_datasets',
+                                  f)) and not re.match(r'_|\.', f):
+        _FOLDER[f'{f}r_language_model'] = f'./datasets/n2c2_datasets/synthetic_n2c2_datasets/{f}'
 
 _SMOKING_LABELS = {'NON-SMOKER': 0,
                    'CURRENT SMOKER': 1,
@@ -62,10 +69,13 @@ class N2c2Dataset(datasets.GeneratorBasedBuilder):
                                               data_dir='../2006_smoking_status'),
                        datasets.BuilderConfig(name='cohort_selection_challenge', version=VERSION,
                                               description="2018 Task 1 cohort selection",
-                                              data_dir='../2018_cohort_selection'),
-                       datasets.BuilderConfig(name='r_language_model', version=VERSION,
-                                              description="ClinicalBERT fine-tuning redundant dataset",
-                                              data_dir='./synthetic_n2c2_datasets')]
+                                              data_dir='../2018_cohort_selection')]
+    for f in os.listdir('./datasets/n2c2_datasets/synthetic_n2c2_datasets'):
+        if os.path.isdir(os.path.join('./datasets/n2c2_datasets/synthetic_n2c2_datasets',
+                                      f)) and not re.match(r'_|\.', f):
+            BUILDER_CONFIGS.append(datasets.BuilderConfig(name=f'{f}r_language_model', version=VERSION,
+                                                          description=f"ClinicalBERT fine-tuning redundant dataset, {f}ws",
+                                                          data_dir=f'./synthetic_n2c2_datasets/{f}'))
     DEFAULT_CONFIG_NAME = 'language_model'
 
     def _info(self):
@@ -98,7 +108,7 @@ class N2c2Dataset(datasets.GeneratorBasedBuilder):
                                      _COHORT_TAGS}
                 }
             )
-        elif self.config.name == 'r_language_model':
+        elif re.search('r_language_model', self.config.name):
             features = datasets.Features(
                 {
                     "sentence": datasets.Value("string"),
@@ -182,7 +192,7 @@ class N2c2Dataset(datasets.GeneratorBasedBuilder):
                             "label_MET": tag_lab,
                             "label_NOTMET": tag_lab
                         }
-                elif self.config.name == 'r_language_model':
+                elif re.search('r_language_model', self.config.name):
                     if len(row) > 0:
                         yield id_, {
                             "sentence": row[-1],
