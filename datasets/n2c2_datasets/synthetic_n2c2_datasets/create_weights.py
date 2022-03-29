@@ -1,34 +1,46 @@
 #!/usr/bin/env python
-from create_vocab import create_vocab_set
-from create_sentences import create_s_dictionary
-import numpy
+import numpy as np
+from collections import Counter
 
 
-def create_weights(vocab, dictionary):
-    note_count = len(dictionary.keys())
-    weights = {}
+def create_weights(notes, vocabulary):
+    all_words = []
+    for n in notes.values():
+        for sen in n:
+            all_words.extend(sen.split(' '))
+    n_words = len(all_words)
+    count_words = Counter(all_words)
+    return {w: -np.log(c / n_words) for w, c in count_words.items() if w in vocabulary}
 
-    for key in dictionary:
-        sentences = dictionary[key]
-        words = []
-        for sentence in sentences:
-            values = sentence.rsplit(" ")
-            words += values
-        dictionary[key] = words
-
-    for word in vocab:
-        word_count = 0
-
-        for key in dictionary:
-            key_words = dictionary[key]
-            if word in key_words:
-                word_count += 1
-
-        weight = numpy.log(note_count / word_count)
-        weights[word] = weight
-
-    return weights
-
+    # """
+    #
+    # :param vocab:
+    # :param dictionary:
+    # :return:
+    # """
+    # note_count = len(dictionary.keys())
+    # weights = {}
+    #
+    # for key in dictionary:
+    #     sentences = dictionary[key]
+    #     words = []
+    #     for sentence in sentences:
+    #         values = sentence.rsplit(" ")
+    #         words += values
+    #     dictionary[key] = words
+    #
+    # for word in vocab:
+    #     word_count = 0
+    #
+    #     for key in dictionary:
+    #         key_words = dictionary[key]
+    #         if word in key_words:
+    #             word_count += 1
+    #
+    #     weight = numpy.log(note_count / word_count)
+    #     weights[word] = weight
+    #
+    # return weights
 
 # file_name = '/Users/alissavalentine/Charney rotation/project code/input/train_sentences.txt'
 # train_file = open(file_name)

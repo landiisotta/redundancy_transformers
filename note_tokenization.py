@@ -65,7 +65,7 @@ def def_tokens(doc):
                 r'[0-9]{1,2}h\.',  # time, e.g., 12h
                 r'(\+[0-9] )?\(?[0-9]{3}\)?[\- ][0-9]{3}[\- ][0-9]{4}',  # phone number
                 r'[0-9]{1,2}\.',  # Numbered lists
-                r'[A-Za-z0-9]+'  # Chemical bounds
+                # r'[A-Za-z0-9]+'  # Chemical bounds
                 ]
     for expression in patterns:
         for match in re.finditer(expression, doc.text):

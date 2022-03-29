@@ -3,12 +3,20 @@
 > it mirrors the redundancy seen in repeated/duplicated notes. In such a case, a given number of 
 > notes might have overlapping content or structure, with some words being altered in the newer note to 
 > express updates on a patient and new sentences added.
+
+> `python create_senword_vocab.py`
+
+Modify number of sentences to add and percentage of words to replace in the bash file.
+Then run:
+
+> `sh create_synthetic_note.sh`
+
 ## Implementation
 ### Modules required:
 1. `add_sentences`: adds specified number of sentences to a given clinical note based on dictionary of sentences from training data
 2. `create_s_dictionary`: creates dictionary of sentences using given input training file
 3. **`create_synthetic_note`: creates files containing synthetic notes and metadata on word and sentence changes
-4. `create_vocab_set`: creates set of tokenized English words from input training file (excludes stop words and word length < 3)
+4. `create_vocab_set`: creates set of tokenized English words from input training file (excludes stop words, words with length <= 3, and abbreviations or special patterns)
 5. `create_weights`: creates dictionary of vocab weight based on word prevalence in sentence dictionary
 6. `repeat_notes`: duplicates a given note and then completes word replacement and sentence addition, also aggregates the metadata on word/sentence changes
 7. `replace_words`: replaces specified percentage of words in a given clinical note based on set of vocab words and their weights

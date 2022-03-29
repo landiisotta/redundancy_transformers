@@ -1,102 +1,97 @@
 #!/usr/bin/env python
-import argparse
-import nltk
-from create_vocab import create_vocab_set
-from create_sentences import create_s_dictionary
-from create_weights import create_weights
-from replace_words import replace_words
-from repeat_note import repeat_notes
-import random
-import numpy
-import os
+import csv
 import sys
+from repeat_note import repeat_note
+from add_sentences import add_sentences
+from replace_words import replace_words
+from create_weights import create_weights
+import argparse
+import os
 
 
-def create_synthetic_note(sent_add, words_replace, training_file_name,
-                          notes_output_file, words_output_file, sent_output_file):
-    """
-    End function
-    :return: 3 files: 1) synthetic notes, 2) vocab meta data, 3) sentence meta data
-    """
-    seed1 = numpy.random.RandomState(40)
-    seed2 = random.Random(40)
-    train_file = open(training_file_name)
-    vocab = create_vocab_set(train_file)
-    train_file = open(training_file_name)
-    sentences = create_s_dictionary(train_file)
-    weights = create_weights(vocab, sentences)
-    train_file = open(training_file_name)
-    new_notes, md_words, md_sentences = repeat_notes(train_file, sent_add, words_replace, vocab, weights, sentences)
+def create_synthetic_corpus(notes, wvocab, senvocab, wrplperc, nsents, weights):
+    wrpl_notes, wrpl_meta = replace_words(notes, wrplperc, wvocab, weights)
+    rp_notes, rp_meta = repeat_note(notes, wrpl_notes)
+    adds_notes, adds_meta = add_sentences(rp_notes, nsents, senvocab)
 
-    synthetic_file = open(notes_output_file, "w")
-    with synthetic_file as file:
-        for note in new_notes:
-            for line in note:
-                file.writelines(line)
-                file.writelines("\n")
-    synthetic_file.close()
+    return adds_notes, wrpl_meta, rp_meta, adds_meta
 
-    word_md_file = open(words_output_file, "w")
-    with word_md_file as file:
-        file.writelines("note_id,old_word_index,old_word_chr,new_word_chr,sentence_index,old_word,new_word\n")
-        for note_changes in md_words:
-            for line in note_changes:
-                file.writelines(str(line))
-                file.writelines("\n")
-    word_md_file.close()
 
-    sentence_md_file = open(sent_output_file, "w")
-    with sentence_md_file as file:
-        file.writelines("note_id,old_sent_count,new_sent_count,"
-                        "sent_source_note_id,sent_source_index\n")
-        for note_changes in md_sentences:
-            for line in note_changes:
-                file.writelines(str(line))
-                file.writelines("\n")
-    sentence_md_file.close()
-
-    train_file.close()
+def _save_meta(meta_obj, step, folder, train=True):
+    if train:
+        fold = 'train'
+    else:
+        fold = 'test'
+    with open(f'./{folder}/{fold}_{step}_metadata.txt', 'w') as f:
+        wr = csv.writer(f)
+        for ll in meta_obj:
+            wr.writerow(ll)
 
 
 if __name__ == '__main__':
-    # Creating description and arguments for script use on the command line
-    parser = argparse.ArgumentParser(description='Give # sentences added, % words replaced')
-    parser.add_argument('--s', '--sentence',
-                        dest='s_add',
+    parser = argparse.ArgumentParser(description='Generate synthetic redundant clinical notes')
+    parser.add_argument('--wr_percentage',
+                        '--wrp',
+                        dest='wr_percentage',
                         type=int,
-                        help='# sentences added',
-                        required=False,
-                        default=2)
-    parser.add_argument('--w', '--word',
-                        dest='w_replace',
+                        help='Percentage (int) of words to replace in each note.')
+    parser.add_argument('--nsents',
+                        '--ns',
+                        dest='nsents',
                         type=int,
-                        help='% words replaced',
-                        required=False,
-                        default=50)
-    parser.add_argument('--input_file',
-                        dest='input_file',
-                        type=str,
-                        help='name of training file',
-                        required=True)
-    parser.add_argument('--output_file',
-                        dest='output_notes',
-                        type=str,
-                        help='name of output notes file',
-                        required=True,
-                        default='synthetic_notes.txt')
-    parser.add_argument('--output_word_metadata_file',
-                        dest='output_word_metadata',
-                        type=str,
-                        help='name of output word metadata file',
-                        required=True,
-                        default='word_metadata.txt')
-    parser.add_argument('--output_sent_metadata_file',
-                        dest='output_sent_metadata',
-                        type=str,
-                        help='name of output sentence metadata file',
-                        required=True,
-                        default='sentence_metadata.txt')
-    # parsing arguments
-    args = parser.parse_args()
-    create_synthetic_note(args.s_add, args.w_replace, args.input_file,
-                          args.output_notes, args.output_word_metadata, args.output_sent_metadata)
+                        help='Number of sentences to replace')
+    parser.add_argument('--train',
+                        dest='train',
+                        action='store_true',
+                        help='Whether to process training or test sets')
+    parser.add_argument('--no-train',
+                        dest='train',
+                        action='store_false',
+                        help='Whether to process training or test sets')
+    config = parser.parse_args(sys.argv[1:])
+    notes = {}
+    if config.train:
+        f = open('../train_sentences.txt', 'r')
+        f_w_to_idx = open('./train_w_to_idx.txt', 'r')
+        f_sen_to_idx = open('./train_sentences_to_idx.txt', 'r')
+    else:
+        f = open('../test_sentences.txt', 'r')
+        f_w_to_idx = open('./test_w_to_idx.txt', 'r')
+        f_sen_to_idx = open('./test_sentences_to_idx.txt', 'r')
+    lines = filter(None, (line.rstrip() for line in f))
+    for line in lines:
+        el = line.rstrip('\n').rsplit(',')
+        notes.setdefault((el[0], el[1]), list()).append(el[2])
+    f.close()
+
+    # Read vocabularies
+    rd = csv.reader(f_w_to_idx)
+    w_to_idx = {r[0]: r[1] for r in rd}
+    f_w_to_idx.close()
+
+    rd = csv.reader(f_sen_to_idx)
+    sen_to_idx = {r[0]: r[1] for r in rd}
+    f_sen_to_idx.close()
+
+    weights = create_weights(notes, w_to_idx)
+    syn_notes, wrpl_meta, rp_meta, adds_meta = create_synthetic_corpus(notes,
+                                                                       w_to_idx,
+                                                                       sen_to_idx,
+                                                                       config.wr_percentage,
+                                                                       config.nsents,
+                                                                       weights)
+    if not os.path.isdir(f'./{config.wr_percentage}{config.nsents}'):
+        os.makedirs(f'./{config.wr_percentage}{config.nsents}')
+
+    _save_meta(wrpl_meta, 'wordrpl', folder=f'{config.wr_percentage}{config.nsents}', train=config.train)
+    _save_meta(rp_meta, 'repbound', folder=f'{config.wr_percentage}{config.nsents}', train=config.train)
+    _save_meta(adds_meta, 'addsen', folder=f'{config.wr_percentage}{config.nsents}', train=config.train)
+
+    if config.train:
+        f = open(f'./{config.wr_percentage}{config.nsents}/train_sentences.txt', 'w')
+    else:
+        f = open(f'./{config.wr_percentage}{config.nsents}/test_sentences.txt', 'w')
+    for k, sen in syn_notes.items():
+        for s in sen:
+            f.writelines(','.join([k[0], k[1], s, '\n']))
+    f.close()
