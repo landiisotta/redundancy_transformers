@@ -51,5 +51,12 @@ Then run:
 ```
 2. Run text below with edits to sentence and word amount at the command line (here there are 3 sentences added, 75% word replacement)
 ```angular2html
-python ./create_synthetic_note.py --s=3 --w=75
+python ./create_synthetic_note.py \
+    --s=3 \
+    --w=75 \
+    --input_file=../synthetic_n2c2_datasets/train_sentences.txt \
+    --output_file=./synthetic_notes/synthetic_notes_375.txt \
+    --output_word_metadata_file=./synthetic_notes/word_metadata_375.txt \
+    --output_sent_metadata_file=./synthetic_notes/sentence_metadata_375.txt
+
 ```
