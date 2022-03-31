@@ -58,6 +58,7 @@ def def_tokens(doc):
                 r'[0-9]{1,4}[/\-][0-9]{1,2}[/\-][0-9]{1,4}',  # date
                 r'[0-9]+\-?[0-9]+%?',  # lab/test result
                 r'[0-9]+/[0-9]+',  # lab/test result
+                r'[0-9]{1,2}\.[0-9]{1,2}',  # lab/test result
                 r'([0-9]{1,3} ?, ?[0-9]{3})+',  # number >= 10^3
                 r'[0-9]{1,2}\+',  # lab/test result
                 r'[A-Za-z]{1,3}\.',  # abbrv, e.g., pt.
@@ -65,6 +66,10 @@ def def_tokens(doc):
                 r'[0-9]{1,2}h\.',  # time, e.g., 12h
                 r'(\+[0-9] )?\(?[0-9]{3}\)?[\- ][0-9]{3}[\- ][0-9]{4}',  # phone number
                 r'[0-9]{1,2}\.',  # Numbered lists
+                r'[0-9]+:[0-9]+:[0-9]+',  # times
+                r'([A-Za-z0-9]+\-)+[A-Za-z0-9]+',  # dashed words
+                r'[0-9]+s',  # decades
+                r'q\.[0-9]h',  # every x hours
                 # r'[A-Za-z0-9]+'  # Chemical bounds
                 ]
     for expression in patterns:
@@ -138,12 +143,11 @@ if __name__ == '__main__':
         for n in tqdm(notes, total=nrow, desc="Writing preprocessed notes to file"):
             for s in n[-1].sents:
                 tkn = []
-                new_tkn = set()
                 for t in s:
                     if t.is_alpha and not t._.is_list:
-                        tkn.append(t.text)
+                        tkn.append(re.sub(' ', '', t.text.strip('.')))
                 if len(tkn) > 0:
-                    f.write(','.join(n[:2]) + ',' + ' '.join(tkn))
+                    f.write(','.join(n[:2]) + ',' + ' '.join(tkn).strip(' '))
                     f.write('\n')
                 else:
                     continue

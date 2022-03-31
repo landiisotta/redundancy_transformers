@@ -16,7 +16,7 @@ def replace_words(notes, percentage, vocab, weight):
         text = []
         l_text = 0
         for line in n:
-            ls = line.split(' ')
+            ls = line.strip(' ').split(' ')
             text.append(ls)
             l_text += len(ls)
 

@@ -93,5 +93,5 @@ if __name__ == '__main__':
         f = open(f'./{config.wr_percentage}{config.nsents}/test_sentences.txt', 'w')
     for k, sen in syn_notes.items():
         for s in sen:
-            f.writelines(','.join([k[0], k[1], s, '\n']))
+            f.writelines(','.join([k[0], k[1], s]) + '\n')
     f.close()

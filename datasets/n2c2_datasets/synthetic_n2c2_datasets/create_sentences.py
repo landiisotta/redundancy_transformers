@@ -13,7 +13,7 @@ def create_sentences(file_input):
     lines = filter(None, (line.rstrip() for line in file_input))
     for line in lines:
         line = str(line).rstrip('\n').rsplit(",")
-        sen = line[2]
+        sen = line[2].strip(' ')
         if len(sen.split(' ')) > 5:
             if sen not in sentence_to_idx:
                 sentence_to_idx[sen] = idx

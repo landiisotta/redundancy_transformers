@@ -1,62 +1,72 @@
-# Synthetic n2c2 datasets
-> This folder contains scripts aimed at generating synthetic clinical notes such that
-> it mirrors the redundancy seen in repeated/duplicated notes. In such a case, a given number of 
-> notes might have overlapping content or structure, with some words being altered in the newer note to 
-> express updates on a patient and new sentences added.
-
-> `python create_senword_vocab.py`
-
-Modify number of sentences to add and percentage of words to replace in the bash file.
-Then run:
-
-> `sh create_synthetic_note.sh`
+# Generate synthetic n2c2 datasets
+Code in this folder aims at generating synthetic clinical note datasets that mirror real-world redundancy. 
+ To simulate the redundancy typically seen in real-world clinical notes, which mainly derives from the 
+ copy-paste practice, for each note we duplicate its content, randomly replace a certain percentage 
+  of words in the second half of the note and add a user-defined number of sentences to the end.
 
 ## Implementation
-### Modules required:
-1. `add_sentences`: adds specified number of sentences to a given clinical note based on dictionary of sentences from training data
-2. `create_s_dictionary`: creates dictionary of sentences using given input training file
-3. **`create_synthetic_note`: creates files containing synthetic notes and metadata on word and sentence changes
-4. `create_vocab_set`: creates set of tokenized English words from input training file (excludes stop words, words with length <= 3, and abbreviations or special patterns)
-5. `create_weights`: creates dictionary of vocab weight based on word prevalence in sentence dictionary
-6. `repeat_notes`: duplicates a given note and then completes word replacement and sentence addition, also aggregates the metadata on word/sentence changes
-7. `replace_words`: replaces specified percentage of words in a given clinical note based on set of vocab words and their weights
->** this is the final module that brings all of them together and outputs what you want
-### Input:
-* **Training data text file**
-  * example: `train_sentences.txt`
-### Output:
-* `synthetic_notes.txt`
-  * Synthetic notes are saved in this file
-  * If original note id is **641**, the related synthetic note id is **641_1**
-* `word_metadata.txt`
-  * Contains 7 columns:
-    1. **note_id**: identifier for given clinical note
-    2. **old_word_index**: the index of the word in the sentence based on words
-    3. **old_word_chr**: the index of the old word in the sentence based on characters
-    4. **new_word_chr**: the index of the new word in the sentence based on characters
-    5. **sentence_index**: the index of the sentence in the current note where a word was replaced
-    6. **old_word**: original word used before replacement
-    7. **new_word**: new word used after replacement
-* `sentence_metadata.txt`
-  * Contains 5 columns:
-      1. **note_id**: identifier for given clinical note
-      2. **old_sent_count**: original number of sentences in clinical note
-      3. **new_sent_count**: number of sentences in clinical note after current sentence addition
-      4. **sent_source_note_id**: note_id for the note where the new sentence was taken from
-      5. **sent_source_index**: the index of the new sentence in its original note
-### Running:
-1. Run text below, edit sentence and word amount in the script
-```angular2html
-./create_synthetic_note.sh
-```
-2. Run text below with edits to sentence and word amount at the command line (here there are 3 sentences added, 75% word replacement)
-```angular2html
-python ./create_synthetic_note.py \
-    --s=3 \
-    --w=75 \
-    --input_file=../synthetic_n2c2_datasets/train_sentences.txt \
-    --output_file=./synthetic_notes/synthetic_notes_375.txt \
-    --output_word_metadata_file=./synthetic_notes/word_metadata_375.txt \
-    --output_sent_metadata_file=./synthetic_notes/sentence_metadata_375.txt
+### Modules
+1. `create_vocab`: creates set of tokenized English words from input training/test files excluding stop words, words with length <= 3, and abbreviations or special patterns;
+2. `create_sentences.py`: creates dictionary of sentences using given input training file;
+3. `create_weights`: creates dictionary of vocab weight based on word frequency, i.e., -log(w_count/total_w);
+4. `add_sentences`: adds specified number of sentences to a given clinical note based on dictionary of sentences from training data;
+5. `repeat_notes`: duplicates notes;
+6. `replace_words`: replaces specified percentage of words in a note based on their weights (higher weights for rarer words).
 
-```
+### Run
+
+```python create_senword_vocab.py```
+
+Which generates the following files (for both training and test):
+- `train|test_w_to_idx.txt` and `train|test_idx_to_w.txt`: vocabulary of words (from `create_vocab.py` module) (1) from 
+the English language; (2) longer than 3 characters; (3) not considered stop words (`nltk package`); (4) not in patterns 
+as specified in the `note_tokenization.py` module. Formats: {w: idx} and {idx: w}.
+- `train|test_sentences_to_idx.txt` and `train|test_idx_to_sentences.txt`: vocabulary of sentences (from `create_sentences.py` module) 
+longer than 5 words.
+
+```sh create_synthetic_note.sh```
+
+After specifying the percentage of words to add as `w` and the number of sentences as `s`, the `create_synthetic_note.py` 
+module does the following (for both training and test sets):
+- It randomly replaces `w`% of words from the vocabulary in each note, choosing with higher probability the rarest words;
+- It duplicates each note, appending the note with the replaced words (from previous point) to the original note;
+- It adds `s` sentences to the end.
+
+Each steps generates metadata files (for both training and test):
+- `train|test_addsen_metadata.txt`: columns 
+> `note_id`
+
+> `challenge`
+
+> `line_new_sen`: index of the first added sentence in the note.
+
+> `sen_idx`: idx of the sentence added, key of the dictionary `train|test_idx_to_sentences`.
+
+- `train|test_repbound_metadata.txt`: columns
+> `note_id`
+
+> `challenge`
+
+> `old_text_startend`: `idxstart::idxend` of the original portion of text, to extract it from notes by sentence add 1 to 
+> `idxend`.
+
+> `redu_text_startend`: redundant text indices, add 1 to the end index as above. The redundant portion indices include 
+> the new added sentences.
+
+- `train|test_wordrpl.txt`: columns
+> `note_id`
+
+> `challenge`
+
+> `w_pos`: character-wise position of the new word chstart:chend in the synthetic note.
+
+> `w_idx`: new word index as listed in dictionary `train|test_idx_to_w`.
+
+> `old_w`: old word.
+
+> `old_pos`: chstart::chend of the old word in the original text.
+
+All outputs are saved into a new folder './$w$s'. Synthetic notes are saved, by sentence in `train|test_sentences.txt`.
+ 
+
+

@@ -5,7 +5,7 @@ seed2 = random.Random(40)
 
 
 def add_sentences(notes, add_num, sen_dictionary):
-    meta_data = [['note_id, challenge, line_new_sen, sen_idx']]  # note_id, challenge, line_new_sen, sen_idx
+    meta_data = [['note_id', 'challenge', 'line_new_sen', 'sen_idx']]  # note_id, challenge, line_new_sen, sen_idx
     redu_notes = {}
     for info, sents in notes.items():
         idx_new_sen_start = len(sents)

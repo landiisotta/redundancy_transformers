@@ -31,7 +31,7 @@ def create_vocab(file_input):
     lines = filter(None, (line.rstrip() for line in file_input))
     for line in lines:
         line = str(line).rstrip('\n').rsplit(",")
-        sentence = line[2]
+        sentence = line[2].strip(' ')
         word_tokens = sentence.split(' ')
         for w in word_tokens:
             ignore = False

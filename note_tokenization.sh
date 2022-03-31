@@ -24,11 +24,11 @@ KEY_FILE=train_newk_to_oldk.csv
 
 # Train
 python -m note_tokenization \
-  -i=$INPUT_DIR \
-  -o=$OUTPUT_DIR \
-  -if=$INPUT_FILE_TRAIN \
-  -of=$OUTPUT_FILE_TRAIN \
-  -k=$KEY_FILE \
+       -i=$INPUT_DIR \
+       -o=$OUTPUT_DIR \
+       -if=$INPUT_FILE_TRAIN \
+       -of=$OUTPUT_FILE_TRAIN \
+       -k=$KEY_FILE \
 
 INPUT_FILE_TEST=test_n2c2_datasets.txt
 OUTPUT_FILE_TEST=test_sentences.txt
@@ -36,8 +36,8 @@ KEY_FILE=test_newk_to_oldk.csv
 
 # Test
 python -m note_tokenization \
-  -i=$INPUT_DIR \
-  -o=$OUTPUT_DIR \
-  -if=$INPUT_FILE_TEST \
-  -of=$OUTPUT_FILE_TEST \
-  -k=$KEY_FILE \
+       -i=$INPUT_DIR \
+       -o=$OUTPUT_DIR \
+       -if=$INPUT_FILE_TEST \
+       -of=$OUTPUT_FILE_TEST \
+       -k=$KEY_FILE \

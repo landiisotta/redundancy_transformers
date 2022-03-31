@@ -27,6 +27,6 @@ OUTPUT_DIR=$DATA_DIR/$FILENAME
 # train_newk_to_oldk.csv and test_newk_to_oldk.csv
 # with NOTE_ID, CH_ID (challenge id), CH_NAME (challenge name) as columns
 python -m create_dataset \
-  --input=$DATA_DIR \
-  --output=$OUTPUT_DIR \
-  --outputfile=$FILENAME
+       --input=$DATA_DIR \
+       --output=$OUTPUT_DIR \
+       --outputfile=$FILENAME
