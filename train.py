@@ -44,16 +44,17 @@ def train_and_eval(train_dataloader,
                    optimizer,
                    scheduler,
                    patience,
-                   sw_redundancy='00',  # Number of sentences added and percentage of words replaced
+                   sw_redundancy_train='00',  # Number of sentences added and percentage of words replaced
+                   sw_redundancy_test='00',
                    n_epochs=10):
     """Run training and evaluate on dev dataset"""
     num_steps = n_epochs * len(train_dataloader.sampler)
     PROGRESS_BAR.total = num_steps
     # Save performance in Tensorboard
-    writer_train = SummaryWriter(f'./runs/BERT-fine-tuning/tensorboard/train/redu{sw_redundancy}')
-    writer_val = SummaryWriter(f'./runs/BERT-fine-tuning/tensorboard/validation/redu{sw_redundancy}')
+    writer_train = SummaryWriter(f'./runs/BERT-fine-tuning/tensorboard/train/redu{sw_redundancy_train}')
+    writer_val = SummaryWriter(f'./runs/BERT-fine-tuning/tensorboard/validation/redu{sw_redundancy_test}')
     # Prepare folder for best model
-    best_model_dir = f'./runs/BERT-fine-tuning/redu{sw_redundancy}'
+    best_model_dir = f'./runs/BERT-fine-tuning/redu{sw_redundancy_train}tr{sw_redundancy_test}ts'
     os.makedirs(best_model_dir, exist_ok=True)
 
     loss_history = []
@@ -62,6 +63,7 @@ def train_and_eval(train_dataloader,
     stopped_epoch = 0
     epoch_chkpt = 0
     previous_loss = 1e15
+    eval_metrics = None
     for epoch in range(n_epochs):
         # Train
         train_metrics, loss = train(train_dataloader, vocab_size, model, optimizer, scheduler)
@@ -118,3 +120,5 @@ def train_and_eval(train_dataloader,
 
     writer_train.close()
     writer_val.close()
+
+    return eval_metrics

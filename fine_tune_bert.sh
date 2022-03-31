@@ -19,9 +19,10 @@ source /sc/arion/work/landii03/redundancy_a100/bin/activate
 unset PYTHONPATH
 
 MAX_SEQ_LENGTH=128
-SW_REDUNDANCY=1530
+SW_REDUNDANCY_TRAIN=1530
+SW_REDUNDANCY_TEST=1530
 DATA_PATH=./datasets/n2c2_datasets/synthetic_n2c2_datasets
-FILE_NAME=new_n2c2datasets_forClinicalBERTfinetuning_maxseqlen$MAX_SEQ_LENGTH$SW_REDUNDANCY.pkl
+FILE_NAME=new_n2c2datasets_forClinicalBERTfinetuning_maxseqlen$MAX_SEQ_LENGTH.pkl
 CHECKPOINT=./models/pretrained_model/clinicalBERT/
 
 EPOCHS=10
@@ -36,4 +37,5 @@ python -m fine_tune_bert \
   --learning_rate=$LEARNING_RATE \
   --patience=4 \
   --dev \
-  --sw_redundancy=$SW_REDUNDANCY
+  --sw_redundancy_train=$SW_REDUNDANCY_TRAIN \
+  --sw_redundancy_test=$SW_REDUNDANCY_TEST

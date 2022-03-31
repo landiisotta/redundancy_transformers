@@ -67,6 +67,3 @@ Each steps generates metadata files (for both training and test):
 > `old_pos`: chstart::chend of the old word in the original text.
 
 All outputs are saved into a new folder './$w$s'. Synthetic notes are saved, by sentence in `train|test_sentences.txt`.
- 
-
-

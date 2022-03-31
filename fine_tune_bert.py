@@ -8,6 +8,7 @@ import pickle as pkl
 import argparse
 import sys
 import time
+import os
 
 # Run on GPU if available
 DEVICE = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
@@ -20,7 +21,8 @@ def run_finetuning(checkpoint,
                    n_epochs,
                    learning_rate,
                    patience,
-                   sw_redundancy,
+                   sw_redundancy_train,
+                   sw_redundancy_test,
                    dev=True):
     """
     Fine-tune ClinicalBERT on MLM and NSP tasks.
@@ -30,15 +32,22 @@ def run_finetuning(checkpoint,
     :param n_epochs: Number of training epochs
     :param learning_rate: Learning rate
     :param patience: (Number of epochs - 1) before stopping
-    :param sw_redundancy: number of sentences added and percentage of words randomly replaced for
-        redundancy investigation
+    :param sw_redundancy_train: number of sentences added and percentage of words randomly replaced for
+        redundancy investigation (training set)
+    :param sw_redundancy_test: number of sentences added and percentage of words randomly replaced for
+        redundancy investigation (test set)
     :param dev: Whether to perform validation on dev dataset
     """
     torch.manual_seed(42)
     torch.cuda.manual_seed(42)
 
-    data, tokenizer = pkl.load(open(data_path, 'rb'))
-
+    if sw_redundancy_train == sw_redundancy_test:
+        data, tokenizer = pkl.load(open(data_path + f'{sw_redundancy_train}.pkl', 'rb'))
+    else:
+        data, tokenizer = pkl.load(open(data_path + f'{sw_redundancy_train}.pkl', 'rb'))
+        data_test, tokenizer_test = pkl.load(open(data_path + f'{sw_redundancy_test}.pkl', 'rb'))
+        data['test'] = data_test['test']
+        tokenizer['test'] = tokenizer_test['test']
     train, tkn_train = data['train'], tokenizer['train']
     train.set_format(type='torch',
                      columns=['input_ids',
@@ -87,15 +96,17 @@ def run_finetuning(checkpoint,
                                                           lr_end=0.0,
                                                           power=1.0,
                                                           last_epoch=-1)
-    train_and_eval(train_dataloader=train_loader,
-                   dev_dataloader=val_loader,
-                   model=model,
-                   n_epochs=n_epochs,
-                   vocab_size=tkn_train.vocab_size,
-                   optimizer=optimizer,
-                   scheduler=scheduler,
-                   patience=patience,
-                   sw_redundancy=sw_redundancy)
+    out_metrics = train_and_eval(train_dataloader=train_loader,
+                                 dev_dataloader=val_loader,
+                                 model=model,
+                                 n_epochs=n_epochs,
+                                 vocab_size=tkn_train.vocab_size,
+                                 optimizer=optimizer,
+                                 scheduler=scheduler,
+                                 patience=patience,
+                                 sw_redundancy_train=sw_redundancy_train,
+                                 sw_redundancy_test=sw_redundancy_test)
+    return out_metrics
 
 
 if __name__ == '__main__':
@@ -126,20 +137,37 @@ if __name__ == '__main__':
                         help='Number of epochs before early stopping.')
     parser.add_argument('--dev', dest='dev_set', action='store_true')
     parser.add_argument('--no-dev', dest='dev_set', action='store_false')
-    parser.add_argument('--sw_redundancy',
-                        dest='sw_redundancy',
+    parser.add_argument('--sw_redundancy_train',
+                        dest='sw_redundancy_train',
+                        type=str,
+                        help='Number of sentences added to the end of the note and '
+                             'percentage of words randomly replaced for redundancy investigation.')
+    parser.add_argument('--sw_redundancy_test',
+                        dest='sw_redundancy_test',
                         type=str,
                         help='Number of sentences added to the end of the note and '
                              'percentage of words randomly replaced for redundancy investigation.')
 
     config = parser.parse_args(sys.argv[1:])
     start = time.time()
-    run_finetuning(checkpoint=config.checkpoint,
-                   data_path=config.data_path,
-                   n_epochs=config.n_epochs,
-                   batch_size=config.batch_size,
-                   learning_rate=config.learning_rate,
-                   patience=config.patience,
-                   dev=config.dev_set,
-                   sw_redundancy=config.sw_redundancy)
+    if os.path.exists('experiments.txt'):
+        f = open('experiments.txt', 'a')
+    else:
+        f = open('experiments.txt', 'a')
+        f.write(','.join(['tr_thrs', 'ts_thrs', 'ppl']))
+        f.write('\n')
+    eval_metrics = run_finetuning(checkpoint=config.checkpoint,
+                                  data_path=config.data_path,
+                                  n_epochs=config.n_epochs,
+                                  batch_size=config.batch_size,
+                                  learning_rate=config.learning_rate,
+                                  patience=config.patience,
+                                  dev=config.dev_set,
+                                  sw_redundancy_train=config.sw_redundancy_train,
+                                  sw_redundancy_test=config.sw_redundancy_test)
+    f.write(','.join([str(config.sw_redundancy_train),
+                      str(config.sw_redundancy_test),
+                      str(eval_metrics['ppl'])]))
+    f.write('\n')
+    f.close()
     print(f"Process finished in {time.time() - start}")
