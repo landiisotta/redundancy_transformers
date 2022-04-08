@@ -44,17 +44,17 @@ def train_and_eval(train_dataloader,
                    optimizer,
                    scheduler,
                    patience,
-                   sw_redundancy_train='00',  # Number of sentences added and percentage of words replaced
-                   sw_redundancy_test='00',
+                   ws_redundancy_train='00',  # Number of sentences added and percentage of words replaced
+                   ws_redundancy_test='00',
                    n_epochs=10):
     """Run training and evaluate on dev dataset"""
     num_steps = n_epochs * len(train_dataloader.sampler)
     PROGRESS_BAR.total = num_steps
     # Save performance in Tensorboard
-    writer_train = SummaryWriter(f'./runs/BERT-fine-tuning/tensorboard/train/redu{sw_redundancy_train}')
-    writer_val = SummaryWriter(f'./runs/BERT-fine-tuning/tensorboard/validation/redu{sw_redundancy_test}')
+    writer_train = SummaryWriter(f'./runs/BERT-fine-tuning/tensorboard/train/redu{ws_redundancy_train}')
+    writer_val = SummaryWriter(f'./runs/BERT-fine-tuning/tensorboard/validation/redu{ws_redundancy_test}')
     # Prepare folder for best model
-    best_model_dir = f'./runs/BERT-fine-tuning/redu{sw_redundancy_train}tr{sw_redundancy_test}ts'
+    best_model_dir = f'./runs/BERT-fine-tuning/redu{ws_redundancy_train}tr{ws_redundancy_test}ts'
     os.makedirs(best_model_dir, exist_ok=True)
 
     loss_history = []

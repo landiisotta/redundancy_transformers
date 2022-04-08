@@ -25,7 +25,10 @@ Create n2c2 datasets from different challenges for clinical notes redundancy inv
 Configurations: (1) language_model: pretrained ClinicalBert fine-tuning on MLM and NSP tasks;
 (2) smoking_challenge: create dataset to fine-tune ClinicalBERT on the 2006 smoking challenge;
 (3) cohort_selection_challenge: 
-(4) r_language_model: create dataset with redundant synthetic notes to fine-tune ClinicalBERT;
+(4) {WS}r_language_model: create dataset with redundant synthetic notes to pretrain ClinicalBERT.
+WS = words percentage and number of sentences;
+(5) {WS}r_smoking_challenge: smoking challenge datasets with redundancy;
+(6) {WS}r_cohort_selection_challenge: cohort selection challenge datasets with redundancy.
 """
 
 # Link to the official homepage
@@ -42,10 +45,21 @@ _HOMEPAGE = "https://portal.dbmi.hms.harvard.edu/projects/n2c2-nlp/"
 _FOLDER = {'language_model': './datasets/n2c2_datasets',
            'smoking_challenge': './datasets/2006_smoking_status',
            'cohort_selection_challenge': './datasets/2018_cohort_selection'}
-for f in os.listdir('./datasets/n2c2_datasets/synthetic_n2c2_datasets'):
-    if os.path.isdir(os.path.join('./datasets/n2c2_datasets/synthetic_n2c2_datasets',
+# Synthetic data for model pretraining
+for f in os.listdir(f'{_FOLDER["language_model"]}/synthetic_n2c2_datasets'):
+    if os.path.isdir(os.path.join(f'{_FOLDER["language_model"]}/synthetic_n2c2_datasets',
                                   f)) and not re.match(r'_|\.', f):
-        _FOLDER[f'{f}r_language_model'] = f'./datasets/n2c2_datasets/synthetic_n2c2_datasets/{f}'
+        _FOLDER[f'{f}r_language_model'] = f'{_FOLDER["language_model"]}/synthetic_n2c2_datasets/{f}'
+# Synthetic data for challenges
+for f in os.listdir(f'{_FOLDER["smoking_challenge"]}/synthetic_2006_smoking_status'):
+    if os.path.isdir(os.path.join(f'{_FOLDER["smoking_challenge"]}/synthetic_2006_smoking_status',
+                                  f)) and not re.match(r'_|\.', f):
+        _FOLDER[f'{f}r_smoking_challenge'] = f'{_FOLDER["smoking_challenge"]}/synthetic_2006_smoking_status/{f}'
+for f in os.listdir(f'{_FOLDER["cohort_selection_challenge"]}/synthetic_2018_cohort_selection'):
+    if os.path.isdir(os.path.join(f'{_FOLDER["cohort_selection_challenge"]}/synthetic_2018_cohort_selection',
+                                  f)) and not re.match(r'_|\.', f):
+        _FOLDER[
+            f'{f}r_cohort_selection_challenge'] = f'{_FOLDER["cohort_selection_challenge"]}/synthetic_2018_cohort_selection/{f}'
 
 _SMOKING_LABELS = {'NON-SMOKER': 0,
                    'CURRENT SMOKER': 1,
@@ -61,25 +75,40 @@ class N2c2Dataset(datasets.GeneratorBasedBuilder):
     """TODO: Short description of my dataset."""
 
     VERSION = datasets.Version("0.0.1")
-    BUILDER_CONFIGS = [datasets.BuilderConfig(name='language_model', version=VERSION,
-                                              description="ClinicalBERT fine-tuning dataset",
-                                              data_dir='./'),
-                       datasets.BuilderConfig(name='smoking_challenge', version=VERSION,
-                                              description="2006 smoking status challenge",
-                                              data_dir='../2006_smoking_status'),
-                       datasets.BuilderConfig(name='cohort_selection_challenge', version=VERSION,
-                                              description="2018 Task 1 cohort selection",
-                                              data_dir='../2018_cohort_selection')]
+    BUILDER_CONFIGS = [
+        datasets.BuilderConfig(name='language_model', version=VERSION,
+                               description="ClinicalBERT pretraining dataset",
+                               data_dir='./'),
+        datasets.BuilderConfig(name='smoking_challenge', version=VERSION,
+                               description="2006 smoking status challenge",
+                               data_dir='../2006_smoking_status'),
+        datasets.BuilderConfig(name='cohort_selection_challenge', version=VERSION,
+                               description="2018 Task 1 cohort selection",
+                               data_dir='../2018_cohort_selection')]
+    # Redundant builder config
     for f in os.listdir('./datasets/n2c2_datasets/synthetic_n2c2_datasets'):
         if os.path.isdir(os.path.join('./datasets/n2c2_datasets/synthetic_n2c2_datasets',
                                       f)) and not re.match(r'_|\.', f):
             BUILDER_CONFIGS.append(datasets.BuilderConfig(name=f'{f}r_language_model', version=VERSION,
-                                                          description=f"ClinicalBERT fine-tuning redundant dataset, {f}ws",
+                                                          description=f"ClinicalBERT pretraining redundant dataset, {f}ws",
                                                           data_dir=f'./synthetic_n2c2_datasets/{f}'))
+    for f in os.listdir('./datasets/2006_smoking_status/synthetic_2006_smoking_status'):
+        if os.path.isdir(os.path.join('./datasets/2006_smoking_status/synthetic_2006_smoking_status',
+                                      f)) and not re.match(r'_|\.', f):
+            BUILDER_CONFIGS.append(datasets.BuilderConfig(name=f'{f}r_smoking_challenge', version=VERSION,
+                                                          description=f"2006 smoking status challenge redundant dataset, {f}ws",
+                                                          data_dir=f'../2006_smoking_status/synthetic_2006_smoking_status/{f}'))
+    for f in os.listdir('./datasets/2018_cohort_selection/synthetic_2018_cohort_selection'):
+        if os.path.isdir(os.path.join('./datasets/2018_cohort_selection/synthetic_2018_cohort_selection',
+                                      f)) and not re.match(r'_|\.', f):
+            BUILDER_CONFIGS.append(datasets.BuilderConfig(name=f'{f}r_cohort_selection_challenge', version=VERSION,
+                                                          description=f"2018 Task 1 cohort selection redundant dataset, {f}ws",
+                                                          data_dir=f'../2018_cohort_selection/synthetic_2018_cohort_selection/{f}'))
+
     DEFAULT_CONFIG_NAME = 'language_model'
 
     def _info(self):
-        if self.config.name == 'language_model':
+        if self.config.name == 'language_model' or re.search('r_language_model', self.config.name):
             # TODO: This method specifies the datasets.DatasetInfo object which contains
             #  informations and typings for the dataset
             features = datasets.Features(
@@ -90,7 +119,7 @@ class N2c2Dataset(datasets.GeneratorBasedBuilder):
                     # These are the features of your dataset like images, labels ...
                 }
             )
-        elif self.config.name == 'smoking_challenge':
+        elif self.config.name == 'smoking_challenge' or re.search('r_smoking_challenge', self.config.name):
             features = datasets.Features(
                 {
                     "note": datasets.Value("string"),
@@ -98,7 +127,8 @@ class N2c2Dataset(datasets.GeneratorBasedBuilder):
                     "label": datasets.ClassLabel(5)
                 }
             )
-        elif self.config.name == 'cohort_selection_challenge':
+        elif self.config.name == 'cohort_selection_challenge' or re.search('r_cohort_selection_challenge',
+                                                                           self.config.name):
             features = datasets.Features(
                 {
                     "note": datasets.Value("string"),
@@ -106,14 +136,6 @@ class N2c2Dataset(datasets.GeneratorBasedBuilder):
                     "label_MET": {tag: datasets.features.ClassLabel(names=["not met", "met"]) for tag in _COHORT_TAGS},
                     "label_NOTMET": {tag: datasets.features.ClassLabel(names=["met", "not met"]) for tag in
                                      _COHORT_TAGS}
-                }
-            )
-        elif re.search('r_language_model', self.config.name):
-            features = datasets.Features(
-                {
-                    "sentence": datasets.Value("string"),
-                    "document": datasets.Value("string"),
-                    "challenge": datasets.Value("string")
                 }
             )
         else:
@@ -167,7 +189,7 @@ class N2c2Dataset(datasets.GeneratorBasedBuilder):
         with open(filepath, 'r', encoding="utf-8") as f:
             rd = csv.reader(f)
             for id_, row in enumerate(rd):
-                if self.config.name == 'language_model':
+                if self.config.name == 'language_model' or re.search('r_language_model', self.config.name):
                     if len(row) > 0:
                         yield id_, {
                             "sentence": row[-1],
@@ -176,14 +198,15 @@ class N2c2Dataset(datasets.GeneratorBasedBuilder):
                         }
                     else:
                         continue
-                elif self.config.name == "smoking_challenge":
+                elif self.config.name == "smoking_challenge" or re.search('r_smoking_challenge', self.config.name):
                     if len(row) > 0:
                         yield id_, {
                             "note": row[-1],
                             "id": str(row[0]),
                             "label": _SMOKING_LABELS[str(row[1])]
                         }
-                elif self.config.name == "cohort_selection_challenge":
+                elif self.config.name == "cohort_selection_challenge" or re.search('r_cohort_selection_challenge',
+                                                                                   self.config.name):
                     if len(row) > 0:
                         tag_lab = {el.split('::')[0]: el.split('::')[1] for el in row[1:-1]}
                         yield id_, {
@@ -191,13 +214,6 @@ class N2c2Dataset(datasets.GeneratorBasedBuilder):
                             "id": str(row[0]),
                             "label_MET": tag_lab,
                             "label_NOTMET": tag_lab
-                        }
-                elif re.search('r_language_model', self.config.name):
-                    if len(row) > 0:
-                        yield id_, {
-                            "sentence": row[-1],
-                            "document": str(row[0]),
-                            "challenge": str(row[1]),
                         }
                 else:
                     pass

@@ -357,7 +357,13 @@ if __name__ == '__main__':
     start = time.time()
     dt = load_dataset(os.path.join('./datasets', config.dataset_name), name=config.config_dataset)
 
-    tokenizer = AutoTokenizer.from_pretrained(ut.checkpoint)
+    if os.path.isdir('./models/pretrained_tokenizer/clinicalBERTmod'):
+        checkpoint = './models/pretrained_tokenizer/clinicalBERTmod'
+        tokenizer = AutoTokenizer.from_pretrained(checkpoint)
+    else:
+        tokenizer = AutoTokenizer.from_pretrained(ut.checkpoint)
+        tokenizer.add_tokens(['[DATE]', '[TIME]'], special_tokens=True)
+        tokenizer.save_pretrained('./models/pretrained_tokenizer/clinicalBERTmod')
 
     rng = random.Random(config.random_seed)
     processed_data = {}

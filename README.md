@@ -36,10 +36,11 @@ Implemented modules:
  unique output. All raw-text clinical notes are output in a table format (columns: NOTE_ID, NOTE_TEXT).
 2. `note_tokenization`: it takes as input all notes and it tokenizes them at the 
 sentence level. It saves tokenized notes to a file with a sentence per line and each note separated by an empty line.
-3. `create_pretraining`: it creates the DatasetDict object for BERT fine-tuning. Code modified from 
+3. `create_pretraining`: it creates the DatasetDict object for ClinicalBERT pretraining. Code modified from 
 [ClinicalBERT](https://github.com/EmilyAlsentzer/clinicalBERT) and [BERT](https://github.com/google-research/bert). 
-4. `fine_tune_bert`: this module fine tunes the pretrained ClinicalBERT model on masked language model and next sequence 
-prediction tasks and it evaluates it at each epoch on the test set. 
+4. `fine_tune_bert`: this module pretraines the already pretrained ClinicalBERT model on masked language model and next sequence 
+prediction tasks and it evaluates it at each epoch on the test set (which here serves as validation). The name of the module
+reflects the fact that the ClinicalBERT has already been pretrained on clinical notes. 
 It returns the best model with early stopping and performances on train and validation (i.e., loss, accuracy, and PPL), 
 see `metrics.py`.
 
@@ -188,6 +189,14 @@ e.g., for specific tasks.
 ## Smoking challenge (2006)
 A corresponding dataset configuration, i.e., `smoking_challenge` in the `n2c2_datasets.py` module allows for the creation 
 of the task Dataset. As a first step data are organized in labeled train/test sentences through the `create_task_datasets.py` script.
+
+Run:
+
+> `python -m create_task_datasets name_challenge raw challenge_folder` (e.g., challenge_folder=2006_smoking_status)
+or to create the task dataset for the non-redundant notes (raw);
+
+> `python -m create_task_datasets name_challenge synthetic challenge_folder` (e.g., challenge_folder=2006_smoking_status)
+>to create the task datasets from the synthetic notes.
 
 To prepare the DatasetDict for the newly pretrained ClinicalBert fine-tuning run:
  ```

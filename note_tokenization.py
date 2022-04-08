@@ -55,7 +55,7 @@ def def_tokens(doc):
     :rtype: spacy.tokens.doc.Doc
     """
     patterns = [r'\[\*\*.+?\*\*\]',  # de-identification
-                r'[0-9]{1,4}[/\-][0-9]{1,2}[/\-][0-9]{1,4}',  # date
+                r'[0-9]{1,4}[/\-][0-9]{1,2}[/\-]*[0-9]*',  # date
                 r'[0-9]+\-?[0-9]+%?',  # lab/test result
                 r'[0-9]+/[0-9]+',  # lab/test result
                 r'[0-9]{1,2}\.[0-9]{1,2}',  # lab/test result
@@ -66,10 +66,11 @@ def def_tokens(doc):
                 r'[0-9]{1,2}h\.',  # time, e.g., 12h
                 r'(\+[0-9] )?\(?[0-9]{3}\)?[\- ][0-9]{3}[\- ][0-9]{4}',  # phone number
                 r'[0-9]{1,2}\.',  # Numbered lists
-                r'[0-9]+:[0-9]+:[0-9]+',  # times
+                r'[0-9]+:[0-9]+:*[0-9]*( AM| PM)*',  # times
                 r'([A-Za-z0-9]+\-)+[A-Za-z0-9]+',  # dashed words
                 r'[0-9]+s',  # decades
                 r'q\.[0-9]h',  # every x hours
+                r'[0-9]{1,3}-*[0-9]* (mg|cc)',
                 # r'[A-Za-z0-9]+'  # Chemical bounds
                 ]
     for expression in patterns:
@@ -117,9 +118,7 @@ if __name__ == '__main__':
 
     start = time.time()
     nlp = spacy.load('./models/en_core_sci_md-0.4.0/en_core_sci_md/en_core_sci_md-0.4.0/',
-                     disable=["ner",
-                              "attribute_ruler",
-                              "lemmatizer"])
+                     disable=["ner"])
     nlp.add_pipe('tkndef', before='parser')
     nlp.add_pipe('custom_sentencizer', before='parser')
     Token.set_extension('is_list', default=False)
@@ -138,19 +137,29 @@ if __name__ == '__main__':
         for r in tqdm(rdlist, desc="Read notes and preprocess", total=nrow):
             notes.append([r[0], f_keys[r[0]]] + [nlp(re.sub('  +', ' ', r[1].replace('\n', ' ')))])
 
-    print(f"Saving notes to file. One sentence per row, notes separated by blank line.")
+    print(f"Saving notes to file. One sentence per row.")
     with open(os.path.join(config.output_folder, config.output_file), 'w') as f:
         for n in tqdm(notes, total=nrow, desc="Writing preprocessed notes to file"):
             for s in n[-1].sents:
                 tkn = []
                 for t in s:
-                    if t.is_alpha and not t._.is_list:
-                        tkn.append(re.sub(' ', '', t.text.strip('.')))
+                    if t.is_alpha and not t._.is_list and t.pos_ != 'PROPN' and len(t.lemma_) > 1:
+                        if re.match(r'[0-9]{1,4}[/\-][0-9]{1,2}[/\-]*[0-9]*$', t.text):
+                            tkn.append('[DATE]')
+                        elif re.match(r'[0-9]+:[0-9]+:*[0-9]*( AM| PM)*', t.text):
+                            tkn.append('[TIME]')
+                        elif re.match(r'\[\*\*.+?\*\*\]', t.text):
+                            continue
+                        elif re.match(r'(\+[0-9] )?\(?[0-9]{3}\)?[\- ][0-9]{3}[\- ][0-9]{4}', t.text):
+                            continue
+                        elif re.match(r'[0-9]{4}[0-9]+', t.text):
+                            continue
+                        else:
+                            tkn.append(re.sub(' ', '', t.lemma_.strip('.')))
                 if len(tkn) > 0:
                     f.write(','.join(n[:2]) + ',' + ' '.join(tkn).strip(' '))
                     f.write('\n')
                 else:
                     continue
-            f.write('\n')
     print('\n')
     print(f"Process ended in {round(time.time() - start, 2)}\n")

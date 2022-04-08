@@ -3,7 +3,7 @@ from tqdm.auto import tqdm
 from torch import nn
 from torch.utils.tensorboard import SummaryWriter
 import numpy as np
-from transformers import AutoModelForSequenceClassification
+from transformers import BertForSequenceClassification
 from transformers.optimization import get_polynomial_decay_schedule_with_warmup, AdamW, get_scheduler
 import sys
 from argparse import ArgumentParser
@@ -13,7 +13,6 @@ import metrics
 import time
 import csv
 import os
-from models.multilabel_bert import MultiLabelBertTask
 
 DEVICE = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
 GPUS = max(torch.cuda.device_count(), 1)
@@ -130,16 +129,19 @@ def _collate_fn_batch(batch):
     """
     Custom collate function for DataLoader.
     """
-    input_ids, labels = [], []
+    input_ids, labels, note_ids = [], [], []
     for b in batch:
         input_ids.append(b['input_ids'][0])
         labels.append(b['labels'][0])
+        note_ids.append(b['id'][0])
     # Added multi-label case
     if isinstance(labels[0], list):
         return {'input_ids': torch.tensor(input_ids),
+                'note_ids': note_ids,
                 'labels': torch.tensor([lab for lab in labels])}
     else:
         return {'input_ids': torch.tensor(input_ids),
+                'note_ids': note_ids,
                 'labels': torch.tensor([[lab] for lab in labels])}
 
 
@@ -222,6 +224,22 @@ if __name__ == '__main__':
                         type=str,
                         help='Challenge name',
                         dest='challenge')
+    parser.add_argument('--ws_redundancy_train',
+                        type=str,
+                        help='Word percentage and number of sentences in the training set',
+                        dest='ws_redundancy_train')
+    parser.add_argument('--ws_redundancy_train',
+                        type=str,
+                        help='Word percentage and number of sentences in the test set',
+                        dest='ws_redundancy_test')
+    parser.add_argument('--window_size',
+                        type=str,
+                        help='Size of the overlapping window',
+                        dest='window_size')
+    parser.add_argument('--max_seq_length',
+                        type=str,
+                        help='Maximum sequence length',
+                        dest='max_seq_length')
     parser.add_argument('--weighting',
                         help='Enabling weighting strategy for overlapping note chunks',
                         dest='weighting',
@@ -248,17 +266,18 @@ if __name__ == '__main__':
     writer_test = SummaryWriter(f'./runs/BERT-task-{config.challenge}/tensorboard/test/{config.learning_rate}')
 
     if config.challenge == 'smoking_challenge':
-        model = AutoModelForSequenceClassification.from_pretrained(config.checkpoint,
-                                                                   num_labels=config.n_classes)
-        model = model.double()
+        model = BertForSequenceClassification.from_pretrained(config.checkpoint,
+                                                              num_labels=config.n_classes)
+        # model = model.double()
     elif config.challenge == 'cohort_selection_challenge':
-        model = MultiLabelBertTask(checkpoint=config.checkpoint,
-                                   labels=config.n_classes)
+        model = BertForSequenceClassification.from_pretrained(checkpoint=config.checkpoint,
+                                                              labels=config.n_classes,
+                                                              problem_type="multi_label_classification")
     else:
         sys.exit()
 
-    ws = config.dataset.split('ws')[-1].split('.')[0]
-    seqlen = config.dataset.split('maxlen')[-1].split('ws')[0]
+    ws = config.ws
+    seqlen = config.max_seq_length
     if config.challenge == 'cohort_selection_challenge':
         class_label = config.dataset.split('_')[-2]
     else:
@@ -267,50 +286,50 @@ if __name__ == '__main__':
 
     train, val, test = data['train'], data['validation'], data['test']
 
-    if config.batch_size:
-        if config.weighting:
-            print("Weighting strategy is incompatible with batching, disabling it.")
-            config.weighting = False
-        if ws != 'None':
-            print(f"Collating data into batches of size {config.batch_size}, please note that "
-                  f"Dataset configuration has window enabled at {ws}, this will cut the note at the length defined"
-                  f" {seqlen}. No weighting method applied.")
-        else:
-            print(f"Collating data into batches of size {config.batch_size}.")
-        train_loader = DataLoader(train,
-                                  shuffle=True,
-                                  collate_fn=_collate_fn_batch,
-                                  batch_size=config.batch_size)
-        val_loader = DataLoader(val,
-                                shuffle=False,
-                                collate_fn=_collate_fn_batch,
-                                batch_size=config.batch_size)
-        test_loader = DataLoader(test,
-                                 shuffle=False,
-                                 collate_fn=_collate_fn_batch,
-                                 batch_size=config.batch_size)
-    else:
-        if ws == 'None':
-            print("Window is not present, but because batch size has not been specified, experiment"
-                  f" will be run with batch size = 1.")
-            if config.weighting:
-                print("Weighting strategy cannot be applied with batch size = 1. Disabling it.")
-                config.weighting = False
-        train_loader = DataLoader(train,
-                                  collate_fn=_collate_fn,
-                                  shuffle=True,
-                                  batch_size=None,
-                                  batch_sampler=None)
-        val_loader = DataLoader(val,
-                                collate_fn=_collate_fn,
-                                shuffle=False,
-                                batch_size=None,
-                                batch_sampler=None)
-        test_loader = DataLoader(test,
-                                 collate_fn=_collate_fn,
-                                 shuffle=False,
-                                 batch_size=None,
-                                 batch_sampler=None)
+    # if config.batch_size:
+    #     if config.weighting:
+    #         print("Weighting strategy is incompatible with batching, disabling it.")
+    #         config.weighting = False
+    #     if ws != 'None':
+    #         print(f"Collating data into batches of size {config.batch_size}, please note that "
+    #               f"Dataset configuration has window enabled at {ws}, this will cut the note at the length defined"
+    #               f" {seqlen}. No weighting method applied.")
+    #     else:
+    #         print(f"Collating data into batches of size {config.batch_size}.")
+    train_loader = DataLoader(train,
+                              shuffle=True,
+                              collate_fn=_collate_fn_batch,
+                              batch_size=config.batch_size)
+    val_loader = DataLoader(val,
+                            shuffle=False,
+                            collate_fn=_collate_fn_batch,
+                            batch_size=config.batch_size)
+    test_loader = DataLoader(test,
+                             shuffle=False,
+                             collate_fn=_collate_fn_batch,
+                             batch_size=config.batch_size)
+    # else:
+    #     if ws == 'None':
+    #         print("Window is not present, but because batch size has not been specified, experiment"
+    #               f" will be run with batch size = 1.")
+    #         if config.weighting:
+    #             print("Weighting strategy cannot be applied with batch size = 1. Disabling it.")
+    #             config.weighting = False
+    #     train_loader = DataLoader(train,
+    #                               collate_fn=_collate_fn,
+    #                               shuffle=True,
+    #                               batch_size=None,
+    #                               batch_sampler=None)
+    #     val_loader = DataLoader(val,
+    #                             collate_fn=_collate_fn,
+    #                             shuffle=False,
+    #                             batch_size=None,
+    #                             batch_sampler=None)
+    #     test_loader = DataLoader(test,
+    #                              collate_fn=_collate_fn,
+    #                              shuffle=False,
+    #                              batch_size=None,
+    #                              batch_sampler=None)
 
     num_training_steps = config.epochs * len(train_loader)
     warmup_steps = round(num_training_steps / 100)

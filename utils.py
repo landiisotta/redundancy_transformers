@@ -35,3 +35,4 @@ test_files = {'smoking': '/2006_smoking_status',
 
 # Pre-trained checkpoint
 checkpoint = "./models/pretrained_tokenizer/clinicalBERT"
+checkpointmod = "./models/pretrained_tokenizer/clinicalBERTmod"

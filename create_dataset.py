@@ -137,10 +137,15 @@ def _merge_dict(dict_list):
     """
     dt = {}
     newk_to_oldk = {}
+    count = {}
     for ch_name, dd in dict_list:
         for k, note in dd.items():
+            if k in count:
+                count[k] += 1
+            else:
+                count[k] = 0
             if k in dt:
-                i = len([idx for idx in dt.keys() if re.match(k, idx)])
+                i = count[k]
                 new_k = '_'.join([k, str(i)])
                 dt[new_k] = note
                 newk_to_oldk[new_k] = (k, ch_name)
@@ -150,7 +155,7 @@ def _merge_dict(dict_list):
     return dt, newk_to_oldk
 
 
-def _write_key_dict(name, k_dict, output_folder):
+def _write_key_dict(name, k_dict, output_folder, train=True):
     """
     Write new_to_old_key dictionary to file.
     :param name: output file name
@@ -223,14 +228,28 @@ if __name__ == '__main__':
     dt_train, tr_k_dict = _merge_dict(train_list)
     dt_test, ts_k_dict = _merge_dict(test_list)
 
-    print(f"Training set number of notes: {len(dt_train)}")
+    # Check for possible duplicates:
+    # Same id and same challenge between train/test
+    inter = set(tr_k_dict.values()).intersection(ts_k_dict.values())
+    # Same note between train and test
+    dup = []
+    for k, n in dt_train.items():
+        for kt, nt in dt_test.items():
+            if n == nt:
+                dup.append(k)
+    # Remove duplicates from training set
+    dt_train_rid = {k: val for k, val in dt_train.items() if tr_k_dict[k] != list(inter)[0] and k not in dup}
+    tr_k_dict_rid = {k: val for k, val in tr_k_dict.items() if tr_k_dict[k] != list(inter)[0] and k not in dup}
+    print(f"Original training set number of notes: {len(dt_train)}")
+    print(f"{len(dt_train) - len(dt_train_rid)} duplicated notes (w/ test set) dropped")
+    print(f"Training set number of notes: {len(dt_train_rid)}")
     print(f"Test set number of notes: {len(dt_test)}")
 
-    _write_file(dt_train,
+    _write_file(dt_train_rid,
                 file_name=config.output_file,
                 output_folder=config.output_folder)
-    _write_key_dict('train_newk_to_oldk', tr_k_dict,
-                    output_folder=config.output_folder)
+    _write_key_dict('train_newk_to_oldk', tr_k_dict_rid,
+                    output_folder=config.output_folder, train=False)
 
     _write_file(dt_test, file_name=config.output_file,
                 output_folder=config.output_folder,

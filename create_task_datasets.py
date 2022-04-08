@@ -73,7 +73,7 @@ def create_challenge_note(sentences, key_dict, labels, challenge):
             else:
                 new_file = '_'.join(['train', current_file[1]])
                 new_dict = '_'.join(['train', current_dict[1]])
-            new_to_old, old_to_new = _read_dict_ids(os.path.join(path, new_dict), challenge)
+            new_to_old, old_to_new = _read_dict_ids(os.path.join('/'.join(path.split('/')[:3]), new_dict), challenge)
             notes = _read_sentences(os.path.join(path, new_file), challenge)
             not_found_keys = _concat_notes(chl_dt, not_found_keys, notes, old_to_new)
 
@@ -130,37 +130,79 @@ if __name__ == '__main__':
             './datasets/2006_smoking_status/smokers_surrogate_train_all_version2.xml')
         test_labels = extract_smoking_status(
             './datasets/2006_smoking_status/smokers_surrogate_test_all_groundtruth_version2.xml')
-
-        chl_train = create_challenge_note('./datasets/n2c2_datasets/train_sentences.txt',
-                                          './datasets/n2c2_datasets/train_newk_to_oldk.csv',
-                                          train_labels,
-                                          challenge='smoking')
-        chl_test = create_challenge_note('./datasets/n2c2_datasets/test_sentences.txt',
-                                         './datasets/n2c2_datasets/test_newk_to_oldk.csv',
-                                         test_labels,
-                                         challenge='smoking')
+        # If synthetic dataset enabled
+        if sys.argv[2] == 'synthetic':
+            chl_train, chl_test = {}, {}
+            for f in os.listdir('./datasets/n2c2_datasets/synthetic_n2c2_datasets'):
+                synth_path = os.path.join('./datasets/n2c2_datasets/synthetic_n2c2_datasets',
+                                          f)
+                if os.path.isdir(synth_path) and not re.match(r'_|\.', f):
+                    chl_train[f.split('/')[-1]] = create_challenge_note(f'{synth_path}/train_sentences.txt',
+                                                                        f'./datasets/n2c2_datasets/train_newk_to_oldk.csv',
+                                                                        train_labels,
+                                                                        challenge='smoking')
+                    chl_test[f.split('/')[-1]] = create_challenge_note(f'{synth_path}/test_sentences.txt',
+                                                                       f'./datasets/n2c2_datasets/test_newk_to_oldk.csv',
+                                                                       test_labels,
+                                                                       challenge='smoking')
+        else:
+            chl_train = create_challenge_note(f'./datasets/n2c2_datasets/train_sentences.txt',
+                                              f'./datasets/n2c2_datasets/train_newk_to_oldk.csv',
+                                              train_labels,
+                                              challenge='smoking')
+            chl_test = create_challenge_note(f'./datasets/n2c2_datasets/test_sentences.txt',
+                                             f'./datasets/n2c2_datasets/test_newk_to_oldk.csv',
+                                             test_labels,
+                                             challenge='smoking')
     elif sys.argv[1] == 'cohort_selection_challenge':
         # Cohort selection challenge (2018 task 1) -- 13 classes
         train_ids = extract_cohort_status('./datasets/2018_cohort_selection/train')
         test_ids = extract_cohort_status('./datasets/2018_cohort_selection/n2c2-t1_gold_standard_test_data/test')
 
-        chl_train = create_challenge_note('./datasets/n2c2_datasets/train_sentences.txt',
-                                          './datasets/n2c2_datasets/train_newk_to_oldk.csv',
-                                          train_ids,
-                                          challenge='long')
-        chl_test = create_challenge_note('./datasets/n2c2_datasets/test_sentences.txt',
-                                         './datasets/n2c2_datasets/test_newk_to_oldk.csv',
-                                         test_ids,
-                                         challenge='long')
+        if sys.argv[2] == 'synthetic':
+            chl_train, chl_test = {}, {}
+            for f in os.listdir('./datasets/n2c2_datasets/synthetic_n2c2_datasets'):
+                synth_path = os.path.join('./datasets/n2c2_datasets/synthetic_n2c2_datasets',
+                                          f)
+                if os.path.isdir(synth_path) and not re.match(r'_|\.', f):
+                    chl_train[f.split('/')[-1]] = create_challenge_note(f'{synth_path}/train_sentences.txt',
+                                                                        f'./datasets/n2c2_datasets/train_newk_to_oldk.csv',
+                                                                        train_ids,
+                                                                        challenge='long')
+                    chl_test[f.split('/')[-1]] = create_challenge_note(f'{synth_path}/test_sentences.txt',
+                                                                       f'./datasets/n2c2_datasets/test_newk_to_oldk.csv',
+                                                                       test_ids,
+                                                                       challenge='long')
+        else:
+            chl_train = create_challenge_note(f'./datasets/n2c2_datasets/train_sentences.txt',
+                                              f'./datasets/n2c2_datasets/train_newk_to_oldk.csv',
+                                              train_ids,
+                                              challenge='long')
+            chl_test = create_challenge_note(f'./datasets/n2c2_datasets/test_sentences.txt',
+                                             f'./datasets/n2c2_datasets/test_newk_to_oldk.csv',
+                                             test_ids,
+                                             challenge='long')
     else:
         chl_train, chl_test = [], []
 
-    data_folder = sys.argv[2]
-    with open(f'datasets/{data_folder}/train_sentences.txt', 'w') as f:
-        wr = csv.writer(f)
-        for line in chl_train:
-            wr.writerow(line)
-    with open(f'datasets/{data_folder}/test_sentences.txt', 'w') as f:
-        wr = csv.writer(f)
-        for line in chl_test:
-            wr.writerow(line)
+    data_folder = sys.argv[3]
+    if sys.argv[2] == 'synthetic':
+        for k in chl_train.keys():
+            os.makedirs(f"datasets/{data_folder}/synthetic_{data_folder}/{k}", exist_ok=True)
+            with open(f'datasets/{data_folder}/synthetic_{data_folder}/{k}/train_sentences.txt', 'w') as f:
+                wr = csv.writer(f)
+                for line in chl_train[k]:
+                    wr.writerow(line)
+            with open(f'datasets/{data_folder}/synthetic_{data_folder}/{k}/test_sentences.txt', 'w') as f:
+                wr = csv.writer(f)
+                for line in chl_test[k]:
+                    wr.writerow(line)
+    else:
+        with open(f'datasets/{data_folder}/train_sentences.txt', 'w') as f:
+            wr = csv.writer(f)
+            for line in chl_train:
+                wr.writerow(line)
+        with open(f'datasets/{data_folder}/test_sentences.txt', 'w') as f:
+            wr = csv.writer(f)
+            for line in chl_test:
+                wr.writerow(line)

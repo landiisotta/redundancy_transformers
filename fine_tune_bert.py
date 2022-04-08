@@ -9,6 +9,7 @@ import argparse
 import sys
 import time
 import os
+from eval import test
 
 # Run on GPU if available
 DEVICE = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
@@ -21,8 +22,8 @@ def run_finetuning(checkpoint,
                    n_epochs,
                    learning_rate,
                    patience,
-                   sw_redundancy_train,
-                   sw_redundancy_test,
+                   ws_redundancy_train,
+                   ws_redundancy_test,
                    dev=True):
     """
     Fine-tune ClinicalBERT on MLM and NSP tasks.
@@ -32,22 +33,43 @@ def run_finetuning(checkpoint,
     :param n_epochs: Number of training epochs
     :param learning_rate: Learning rate
     :param patience: (Number of epochs - 1) before stopping
-    :param sw_redundancy_train: number of sentences added and percentage of words randomly replaced for
+    :param ws_redundancy_train: number of sentences added and percentage of words randomly replaced for
         redundancy investigation (training set)
-    :param sw_redundancy_test: number of sentences added and percentage of words randomly replaced for
+    :param ws_redundancy_test: number of sentences added and percentage of words randomly replaced for
         redundancy investigation (test set)
     :param dev: Whether to perform validation on dev dataset
     """
     torch.manual_seed(42)
     torch.cuda.manual_seed(42)
 
-    if sw_redundancy_train == sw_redundancy_test:
-        data, tokenizer = pkl.load(open(data_path + f'{sw_redundancy_train}.pkl', 'rb'))
-    else:
-        data, tokenizer = pkl.load(open(data_path + f'{sw_redundancy_train}.pkl', 'rb'))
-        data_test, tokenizer_test = pkl.load(open(data_path + f'{sw_redundancy_test}.pkl', 'rb'))
-        data['test'] = data_test['test']
-        tokenizer['test'] = tokenizer_test['test']
+    data, tokenizer = pkl.load(open(data_path + f'{ws_redundancy_train}.pkl', 'rb'))
+
+    # Load pretrained model
+    model = BertForPreTraining.from_pretrained(checkpoint)
+    model.resize_token_embeddings(len(tokenizer['train']))
+
+    # If redundancy thrs do not match between tr and ts it means that we have already pretrained the
+    # model on the desired training threshold (and saved the best model) and we can directly test it on the test set.
+    if ws_redundancy_train != ws_redundancy_test:
+        best_model_dir = f'./runs/BERT-fine-tuning/redu{ws_redundancy_train}tr{ws_redundancy_train}ts'
+        if ws_redundancy_test != '00':
+            data_path = data_path + '/synthetic_n2c2_datasets'
+        data, tokenizer = pkl.load(open(data_path + f'{ws_redundancy_test}.pkl', 'rb'))
+        model = BertForPreTraining.from_pretrained(best_model_dir, from_tf=False)
+        model.to(DEVICE)
+        testset = data['test']
+        testset.set_format(type='torch',
+                           columns=['input_ids',
+                                    'attention_mask',
+                                    'token_type_ids',
+                                    'next_sentence_label',
+                                    'labels'])
+        val_loader = DataLoader(testset,
+                                batch_size=batch_size,
+                                shuffle=False)
+        out_metrics, _ = test(val_loader, model, len(tokenizer))
+        return out_metrics
+
     train, tkn_train = data['train'], tokenizer['train']
     train.set_format(type='torch',
                      columns=['input_ids',
@@ -77,8 +99,6 @@ def run_finetuning(checkpoint,
     print(f"Number of training steps: {num_training_steps}")
     warmup_steps = round(num_training_steps / 100)
     # warmup_steps = 0
-    # Load pretrained model
-    model = BertForPreTraining.from_pretrained(checkpoint)
     # Run on multiple GPUs if available
     if torch.cuda.device_count() > 1:
         print("Using", torch.cuda.device_count(), "GPUs")
@@ -100,12 +120,12 @@ def run_finetuning(checkpoint,
                                  dev_dataloader=val_loader,
                                  model=model,
                                  n_epochs=n_epochs,
-                                 vocab_size=tkn_train.vocab_size,
+                                 vocab_size=len(tkn_train),
                                  optimizer=optimizer,
                                  scheduler=scheduler,
                                  patience=patience,
-                                 sw_redundancy_train=sw_redundancy_train,
-                                 sw_redundancy_test=sw_redundancy_test)
+                                 ws_redundancy_train=ws_redundancy_train,
+                                 ws_redundancy_test=ws_redundancy_test)
     return out_metrics
 
 
@@ -137,13 +157,13 @@ if __name__ == '__main__':
                         help='Number of epochs before early stopping.')
     parser.add_argument('--dev', dest='dev_set', action='store_true')
     parser.add_argument('--no-dev', dest='dev_set', action='store_false')
-    parser.add_argument('--sw_redundancy_train',
-                        dest='sw_redundancy_train',
+    parser.add_argument('--ws_redundancy_train',
+                        dest='ws_redundancy_train',
                         type=str,
                         help='Number of sentences added to the end of the note and '
                              'percentage of words randomly replaced for redundancy investigation.')
-    parser.add_argument('--sw_redundancy_test',
-                        dest='sw_redundancy_test',
+    parser.add_argument('--ws_redundancy_test',
+                        dest='ws_redundancy_test',
                         type=str,
                         help='Number of sentences added to the end of the note and '
                              'percentage of words randomly replaced for redundancy investigation.')
@@ -163,10 +183,10 @@ if __name__ == '__main__':
                                   learning_rate=config.learning_rate,
                                   patience=config.patience,
                                   dev=config.dev_set,
-                                  sw_redundancy_train=config.sw_redundancy_train,
-                                  sw_redundancy_test=config.sw_redundancy_test)
-    f.write(','.join([str(config.sw_redundancy_train),
-                      str(config.sw_redundancy_test),
+                                  ws_redundancy_train=config.ws_redundancy_train,
+                                  ws_redundancy_test=config.ws_redundancy_test)
+    f.write(','.join([str(config.ws_redundancy_train),
+                      str(config.ws_redundancy_test),
                       str(eval_metrics['ppl'])]))
     f.write('\n')
     f.close()

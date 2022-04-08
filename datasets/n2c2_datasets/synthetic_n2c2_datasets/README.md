@@ -13,7 +13,7 @@ Code in this folder aims at generating synthetic clinical note datasets that mir
 5. `repeat_notes`: duplicates notes;
 6. `replace_words`: replaces specified percentage of words in a note based on their weights (higher weights for rarer words).
 
-### Run
+### Run (from synthetic dataset folder)
 
 ```python create_senword_vocab.py```
 
