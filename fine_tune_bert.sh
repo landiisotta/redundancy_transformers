@@ -7,7 +7,7 @@
 #BSUB -R a100
 #BSUB -R affinity[core(10)]
 #BSUB -R rusage[mem=64000]
-#BSUB -R rusage[ngpus_excl_p=2]
+#BSUB -R rusage[ngpus_excl_p=1]
 #BSUB -o %J.stdout
 #BSUB -eo %J.stderr
 #BSUB -L /bin/bash
@@ -19,8 +19,8 @@ source /sc/arion/work/landii03/redundancy_a100/bin/activate
 unset PYTHONPATH
 
 MAX_SEQ_LENGTH=128
-WS_REDUNDANCY_TRAIN=15
-WS_REDUNDANCY_TEST=15
+WS_REDUNDANCY_TRAIN=1010
+WS_REDUNDANCY_TEST=510
 # The data path should correspond to the selected thresholds for the training set
 DATA_PATH=./datasets/n2c2_datasets
 FILE_NAME=n2c2datasets_forClinicalBERTfinetuning_maxseqlen$MAX_SEQ_LENGTH

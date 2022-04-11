@@ -42,18 +42,10 @@ def run_finetuning(checkpoint,
     torch.manual_seed(42)
     torch.cuda.manual_seed(42)
 
-    data, tokenizer = pkl.load(open(data_path + f'{ws_redundancy_train}.pkl', 'rb'))
-
-    # Load pretrained model
-    model = BertForPreTraining.from_pretrained(checkpoint)
-    model.resize_token_embeddings(len(tokenizer['train']))
-
     # If redundancy thrs do not match between tr and ts it means that we have already pretrained the
     # model on the desired training threshold (and saved the best model) and we can directly test it on the test set.
     if ws_redundancy_train != ws_redundancy_test:
         best_model_dir = f'./runs/BERT-fine-tuning/redu{ws_redundancy_train}tr{ws_redundancy_train}ts'
-        if ws_redundancy_test != '00':
-            data_path = data_path + '/synthetic_n2c2_datasets'
         data, tokenizer = pkl.load(open(data_path + f'{ws_redundancy_test}.pkl', 'rb'))
         model = BertForPreTraining.from_pretrained(best_model_dir, from_tf=False)
         model.to(DEVICE)
@@ -64,11 +56,18 @@ def run_finetuning(checkpoint,
                                     'token_type_ids',
                                     'next_sentence_label',
                                     'labels'])
-        val_loader = DataLoader(testset,
-                                batch_size=batch_size,
-                                shuffle=False)
-        out_metrics, _ = test(val_loader, model, len(tokenizer))
+        test_loader = DataLoader(testset,
+                                 batch_size=batch_size,
+                                 shuffle=False)
+        out_metrics, _ = test(test_loader, model, len(tokenizer['test']))
+        print(f"Model trained on redundancy {ws_redundancy_train}, tested on redundancy {ws_redundancy_test}:")
+        print(out_metrics)
         return out_metrics
+
+    data, tokenizer = pkl.load(open(data_path + f'{ws_redundancy_train}.pkl', 'rb'))
+    # Load pretrained model
+    model = BertForPreTraining.from_pretrained(checkpoint)
+    model.resize_token_embeddings(len(tokenizer['train']))
 
     train, tkn_train = data['train'], tokenizer['train']
     train.set_format(type='torch',

@@ -50,54 +50,69 @@ def training(train_set,
         batch = {k: v.to(DEVICE) for k, v in batch.items()}
         outputs = model(**batch)
 
-        wloss, _ = _compute_wloss(batch, outputs, batches, weighting, challenge=challenge)
-        wloss.sum().backward()
+        loss, logits = outputs.loss, outputs.logits
+        loss.sum().backward()
         optimizer.step()
         lr_scheduler.step()
         optimizer.zero_grad()
         progress_bar.update(1)
-
-        if weighting:
-            loss_batches += wloss.sum().item()
-        else:
-            if batches:
-                loss_batches += wloss.sum().item() * batch['input_ids'].shape[0]
-            else:
-                loss_batches += wloss.sum().item()
+        loss_batches += loss.sum().item() * batch['input_ids'].shape[0]
 
     # Validation
     model.eval()
     loss_batches_eval = 0
+    val_metrics = metrics.TaskMetrics(challenge=config.challenge)
+    valpred_dict = {}
+    vallabel_dict = {}
     for batch in dev_set:
+        valnote_ids = batch['note_ids']
         batch = {k: v.to(DEVICE) for k, v in batch.items()}
-
         with torch.no_grad():
             outputs = model(**batch)
 
-        val_loss, output = _compute_wloss(batch, outputs, batches, weighting, challenge)
+        val_loss, val_output = outputs.loss, outputs.logits
+        loss_batches_eval += val_loss.sum().item() * batch['input_ids'].shape[0]
+        for i, nid in enumerate(valnote_ids):
+            valpred_dict.setdefault(nid, list()).append(val_output[i].tolist())
+            if nid not in vallabel_dict:
+                vallabel_dict[nid] = batch['labels'][i][0].item()
+    if weighting:
+        pred, true = _compute_wpred(valpred_dict, vallabel_dict)
+    else:
 
-        if weighting:
-            loss_batches_eval += val_loss.sum().item()
-            train_metrics.add_batch(batch['labels'][0].item(),
-                                    torch.argmax(output).item())
-        else:
-            if batches:
-                loss_batches_eval += val_loss.sum().item() * batch['input_ids'].shape[0]
-                # extend
-                if challenge == 'smoking_challenge':
-                    train_metrics.add_batch(batch['labels'].view(-1).tolist(),
-                                            torch.argmax(outputs.logits, dim=-1).tolist())
-                elif challenge == 'cohort_selection_challenge':
-                    train_metrics.add_batch(batch['labels'].tolist(),
-                                            _get_labels(output))
+            # Test
+            line = fixed_info + ['', '', '']
+            model.eval()
+            test_metrics = metrics.TaskMetrics(challenge=config.challenge)
+            test_loss = 0
+            pred_dict = {}
+            label_dict = {}
+            for test_batch in test_loader:
+                note_ids = test_batch['note_ids']
+                test_batch = {k: v.to(DEVICE) for k, v in test_batch.items() if k != 'note_ids'}
+                with torch.no_grad():
+                    outputs = model(**test_batch)
+                loss, output = outputs.loss, outputs.logits
+                test_loss += loss.sum().item() * test_batch['input_ids'].shape[0]
+
+                # Aggregate outputs by note_id
+                for i, nid in enumerate(note_ids):
+                    pred_dict.setdefault(nid, list()).append(output[i].tolist())
+                    if nid not in label_dict:
+                        label_dict[nid] = test_batch['labels'][i][0].item()
+
+            if config.weighting:
+                pred, true = _compute_wpred(pred_dict, label_dict)
+
             else:
-                loss_batches_eval += val_loss.sum().item()
-                if challenge == 'smoking_challenge':
-                    train_metrics.add_batch(batch['labels'][0].item(),
-                                            torch.argmax(output).item())
-                elif challenge == 'cohort_selection_challenge':
-                    train_metrics.add_batch([batch['labels'][0].tolist()],
-                                            _get_labels(output))
+                true = []
+                pred = torch.tensor([])
+                for nid, val in pred_dict.items():
+                    pred = torch.cat(pred, torch.mean(torch.tensor(val), dim=0))
+                    true.append(label_dict[nid])
+            test_metrics.add_batch(true, torch.argmax(pred, dim=-1).tolist())
+            eval_metrics = test_metrics.compute()
+            writer_test.add_scalar('Test loss', test_loss / (len(test_loader) * GPUS))
 
     return loss_batches / (len(train_set.sampler) * GPUS), loss_batches_eval / (
             len(dev_set.sampler) * GPUS), train_metrics.compute()
@@ -110,19 +125,19 @@ def _normal_density(x, mu, sigma):
     return (2. * np.pi * sigma ** 2.) ** -.5 * np.exp(-.5 * (x - mu) ** 2. / sigma ** 2.)
 
 
-def _collate_fn(batch):
-    """
-    Custom collate function for DataLoader.
-    """
-    input_ids = batch['input_ids']
-    labels = batch['labels']
-    # Added multi-label case
-    if isinstance(labels[0], list):
-        return {'input_ids': torch.tensor(input_ids),
-                'labels': torch.tensor(labels)}
-    else:
-        return {'input_ids': torch.tensor(input_ids),
-                'labels': torch.tensor([[lab] for lab in labels])}
+# def _collate_fn(batch):
+#     """
+#     Custom collate function for DataLoader.
+#     """
+#     input_ids = batch['input_ids']
+#     labels = batch['labels']
+#     # Added multi-label case
+#     if isinstance(labels[0], list):
+#         return {'input_ids': torch.tensor(input_ids),
+#                 'labels': torch.tensor(labels)}
+#     else:
+#         return {'input_ids': torch.tensor(input_ids),
+#                 'labels': torch.tensor([[lab] for lab in labels])}
 
 
 def _collate_fn_batch(batch):
@@ -145,47 +160,25 @@ def _collate_fn_batch(batch):
                 'labels': torch.tensor([[lab] for lab in labels])}
 
 
-def _compute_wloss(batch, outputs, batches, weighting_method, challenge):
+def _compute_wpred(logits_dict, true_labels):
     """
     If weighting method is enabled: compute loss of overlapping note chunks weighting more the initial vectors;
      Otherwise: return batched loss.
     """
-    if weighting_method:
+    pred = torch.tensor([])
+    lab = []
+    for nid, val in logits_dict.items():
         # weight initial vectors more
-        mid = float(int(batch['input_ids'].shape[0] / 2))
+        mid = float(int(len(val) / 2))
         if mid > 0:
             norm_dist = np.array(
-                [(i / mid) for i in range(batch['input_ids'].shape[0])])
+                [(i / mid) for i in range(len(val))])
             weights = torch.tensor(np.array([_normal_density(norm_dist, 0, 1)]), device=DEVICE).double()
         else:
             weights = torch.tensor(np.array([[1]]), device=DEVICE).double()
-
-        wloss = nn.functional.cross_entropy(torch.matmul(weights, outputs.logits),
-                                            batch['labels'][0].view(-1))
-        output = torch.matmul(weights, outputs.logits)
-    else:
-        if batches:
-            if challenge == 'smoking_challenge':
-                wloss = outputs.loss
-                output = outputs.logits
-            elif challenge == 'cohort_selection_challenge':
-                wloss = nn.functional.binary_cross_entropy(outputs, batch['labels'].float())
-                output = outputs
-            else:
-                output, wloss = None, None
-        else:
-            if challenge == 'smoking_challenge':
-                weights = torch.tensor(np.array([[1] * batch['labels'].shape[0]]), device=DEVICE).double()
-                wloss = nn.functional.cross_entropy(torch.matmul(weights, outputs.logits),
-                                                    batch['labels'][0].view(-1))
-                output = torch.matmul(weights, outputs.logits)
-            elif challenge == 'cohort_selection_challenge':
-                output = torch.max(outputs, dim=0).values.view(1, -1)
-                wloss = nn.functional.binary_cross_entropy(output,
-                                                           batch['labels'][0].view(1, -1).float())
-            else:
-                output, wloss = None, None
-    return wloss, output
+        pred = torch.cat((pred, torch.matmul(weights, torch.tensor(val))))
+        lab.append(true_labels[nid])
+    return pred, lab
 
 
 def _get_labels(out_sigmoids, threshold=0.5):
@@ -260,11 +253,16 @@ if __name__ == '__main__':
         print("Incompatible commands, cannot fine-tune cohort selection challenge with weighting method.")
         print("Exiting main...")
         sys.exit()
+    # Create files with tensorboard performances
+    tensorboard_folder = f'{config.challenge}{config.ws_redundancy_training}tr{config.ws_redundancy_test}ts'
+    writer_train = SummaryWriter(
+        f'./runs/BERT-task-{config.challenge}/tensorboard/{tensorboard_folder}/train/{config.learning_rate}')
+    writer_val = SummaryWriter(
+        f'./runs/BERT-task-{config.challenge}/tensorboard/{tensorboard_folder}/validation/{config.learning_rate}')
+    writer_test = SummaryWriter(
+        f'./runs/BERT-task-{config.challenge}/tensorboard/{tensorboard_folder}/test/{config.learning_rate}')
 
-    writer_train = SummaryWriter(f'./runs/BERT-task-{config.challenge}/tensorboard/train/{config.learning_rate}')
-    writer_val = SummaryWriter(f'./runs/BERT-task-{config.challenge}/tensorboard/validation/{config.learning_rate}')
-    writer_test = SummaryWriter(f'./runs/BERT-task-{config.challenge}/tensorboard/test/{config.learning_rate}')
-
+    # Load model (5-class classification for smoking challenge; 13-class multi-label for cohort selection)
     if config.challenge == 'smoking_challenge':
         model = BertForSequenceClassification.from_pretrained(config.checkpoint,
                                                               num_labels=config.n_classes)
@@ -274,28 +272,16 @@ if __name__ == '__main__':
                                                               labels=config.n_classes,
                                                               problem_type="multi_label_classification")
     else:
+        print("Challenge not yet implemented... come back later")
         sys.exit()
-
-    ws = config.ws
-    seqlen = config.max_seq_length
+    # For cohort selection, if class label = MET then that is coded as 1, otherwise NOTMET=1
     if config.challenge == 'cohort_selection_challenge':
         class_label = config.dataset.split('_')[-2]
     else:
         class_label = None
+    # Load data pickle
     data = pkl.load(open(config.dataset, 'rb'))
-
     train, val, test = data['train'], data['validation'], data['test']
-
-    # if config.batch_size:
-    #     if config.weighting:
-    #         print("Weighting strategy is incompatible with batching, disabling it.")
-    #         config.weighting = False
-    #     if ws != 'None':
-    #         print(f"Collating data into batches of size {config.batch_size}, please note that "
-    #               f"Dataset configuration has window enabled at {ws}, this will cut the note at the length defined"
-    #               f" {seqlen}. No weighting method applied.")
-    #     else:
-    #         print(f"Collating data into batches of size {config.batch_size}.")
     train_loader = DataLoader(train,
                               shuffle=True,
                               collate_fn=_collate_fn_batch,
@@ -308,28 +294,6 @@ if __name__ == '__main__':
                              shuffle=False,
                              collate_fn=_collate_fn_batch,
                              batch_size=config.batch_size)
-    # else:
-    #     if ws == 'None':
-    #         print("Window is not present, but because batch size has not been specified, experiment"
-    #               f" will be run with batch size = 1.")
-    #         if config.weighting:
-    #             print("Weighting strategy cannot be applied with batch size = 1. Disabling it.")
-    #             config.weighting = False
-    #     train_loader = DataLoader(train,
-    #                               collate_fn=_collate_fn,
-    #                               shuffle=True,
-    #                               batch_size=None,
-    #                               batch_sampler=None)
-    #     val_loader = DataLoader(val,
-    #                             collate_fn=_collate_fn,
-    #                             shuffle=False,
-    #                             batch_size=None,
-    #                             batch_sampler=None)
-    #     test_loader = DataLoader(test,
-    #                              collate_fn=_collate_fn,
-    #                              shuffle=False,
-    #                              batch_size=None,
-    #                              batch_sampler=None)
 
     num_training_steps = config.epochs * len(train_loader)
     warmup_steps = round(num_training_steps / 100)
@@ -355,26 +319,37 @@ if __name__ == '__main__':
     if torch.cuda.device_count() > 1:
         print("Using", torch.cuda.device_count(), "GPUs")
         model = nn.DataParallel(model)
-
     val_split = round(val.num_rows / train.num_rows, 1)
-    if not os.path.isdir(f'./runs/BERT-task-{config.challenge}/experiments'):
-        os.makedirs(f'./runs/BERT-task-{config.challenge}/experiments')
-    if config.challenge == 'cohort_selection_challenge':
-        metrics_file = open(os.path.join(f'./runs/BERT-task-{config.challenge}/experiments/',
-                                         f'metrics_valsplit{val_split}lr{config.learning_rate}ws{ws}seqlen{seqlen}batch'
-                                         f'{config.batch_size}weights{config.weighting}_{class_label}.csv'), 'w')
-    else:
-        metrics_file = open(os.path.join(f'./runs/BERT-task-{config.challenge}/experiments/',
-                                         f'metrics_valsplit{val_split}lr{config.learning_rate}ws{ws}seqlen{seqlen}batch'
-                                         f'{config.batch_size}weights{config.weighting}.csv'), 'w')
-    wr = csv.writer(metrics_file)
-    colnames = ['learning_rate', 'val_split', 'window_size', 'sequence_length', 'batch_size', 'weighting_enabled',
+
+    # Create documents with results
+    colnames = ['ws_training', 'ws_test',
+                'learning_rate', 'val_split', 'window_size',
+                'sequence_length', 'batch_size', 'weighting_enabled',
                 'epoch', 'tr_loss', 'val_loss'] + ['f1_micro', 'f1_macro'] + \
                [f'f1_class{cl}' for cl in range(config.n_classes)] + ['p_micro', 'p_macro'] + \
                [f'p_class{cl}' for cl in range(config.n_classes)] + ['r_micro', 'r_macro'] + \
                [f'r_class{cl}' for cl in range(config.n_classes)]
-    wr.writerow(colnames)
-    fixed_info = [config.learning_rate, val_split, ws, seqlen, config.batch_size, config.weighting]
+    if config.challenge == 'cohort_selection_challenge':
+        if os.path.exists(f'experiments_{config.challenge}_{class_label}.csv'):
+            metrics_file = open(f'experiments_{config.challenge}_{class_label}.csv', 'a')
+            wr = csv.writer(metrics_file)
+        else:
+            metrics_file = open(f'experiments_{config.challenge}_{class_label}.csv', 'a')
+            wr = csv.writer(metrics_file)
+            wr.writerow(colnames)
+
+    else:
+        if os.path.exists(f'experiments_{config.challenge}.csv'):
+            metrics_file = open(f'experiments_{config.challenge}.csv', 'a')
+            wr = csv.writer(metrics_file)
+        else:
+            metrics_file = open(f'experiments_{config.challenge}.csv', 'a')
+            wr = csv.writer(metrics_file)
+            wr.writerow(colnames)
+
+    fixed_info = [config.ws_redundancy_traiing, config.ws_redundancy_test,
+                  config.learning_rate, val_split, config.max_sequence_length,
+                  config.batch_size, config.weighting]
 
     model.to(DEVICE)
     # Training
@@ -416,37 +391,32 @@ if __name__ == '__main__':
     model.eval()
     test_metrics = metrics.TaskMetrics(challenge=config.challenge)
     test_loss = 0
+    pred_dict = {}
+    label_dict = {}
     for test_batch in test_loader:
-        test_batch = {k: v.to(DEVICE) for k, v in test_batch.items()}
+        note_ids = test_batch['note_ids']
+        test_batch = {k: v.to(DEVICE) for k, v in test_batch.items() if k != 'note_ids'}
         with torch.no_grad():
             outputs = model(**test_batch)
+        loss, output = outputs.loss, outputs.logits
+        test_loss += loss.sum().item() * test_batch['input_ids'].shape[0]
 
-        wloss, output = _compute_wloss(test_batch,
-                                       outputs,
-                                       config.batch_size,
-                                       weighting_method=config.weighting,
-                                       challenge=config.challenge)
-        if config.weighting:
-            test_metrics.add_batch(test_batch['labels'][0].item(), torch.argmax(output).item())
-            test_loss += wloss.sum().item()
-        else:
-            if config.batch_size:
-                test_loss += wloss.sum().item() * test_batch['input_ids'].shape[0]
-                # extend
-                if config.challenge == 'smoking_challenge':
-                    test_metrics.add_batch(test_batch['labels'].view(-1).tolist(),
-                                           torch.argmax(outputs.logits, dim=-1).tolist())
-                elif config.challenge == 'cohort_selection_challenge':
-                    test_metrics.add_batch(test_batch['labels'].tolist(),
-                                           _get_labels(output))
+        # Aggregate outputs by note_id
+        for i, nid in enumerate(note_ids):
+            pred_dict.setdefault(nid, list()).append(output[i].tolist())
+            if nid not in label_dict:
+                label_dict[nid] = test_batch['labels'][i][0].item()
 
-            else:
-                test_loss += wloss.sum().item()
-                if config.challenge == 'smoking_challenge':
-                    test_metrics.add_batch(test_batch['labels'][0].item(), torch.argmax(output).item())
-                elif config.challenge == 'cohort_selection_challenge':
-                    test_metrics.add_batch([test_batch['labels'][0].tolist()], _get_labels(output))
+    if config.weighting:
+        pred, true = _compute_wpred(pred_dict, label_dict)
 
+    else:
+        true = []
+        pred = torch.tensor([])
+        for nid, val in pred_dict.items():
+            pred = torch.cat(pred, torch.mean(torch.tensor(val), dim=0))
+            true.append(label_dict[nid])
+    test_metrics.add_batch(true, torch.argmax(pred, dim=-1).tolist())
     eval_metrics = test_metrics.compute()
     writer_test.add_scalar('Test loss', test_loss / (len(test_loader) * GPUS))
 

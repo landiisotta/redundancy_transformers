@@ -216,8 +216,8 @@ def create_masked_lm_predictions(tokens, masked_lm_prob,
     rng.shuffle(cand_indexes)
 
     output_tokens = list(tokens)
-
-    num_to_predict = min(max_predictions_per_seq,
+    # use (max_prediction_per_seq - 1) because last token is always masked to compute PPL
+    num_to_predict = min(max_predictions_per_seq - 1,
                          max(1, int(round(len(tokens) * masked_lm_prob))))
 
     masked_lms = []
@@ -285,7 +285,9 @@ def write_instance_to_example(instances, tokenizer, max_seq_length,
         masked_lm_weights = [1.0] * len(masked_lm_ids)
 
         # Add mask to last position to compute PPL
-        if len(masked_lm_positions) <= max_predictions_per_seq:
+        # if len(masked_lm_positions) <= max_predictions_per_seq:
+        # if not already masked
+        if input_ids[ppl_idx] != tokenizer.vocab['[MASK]']:
             masked_lm_positions.append(ppl_idx)
             masked_lm_ids.append(input_ids[ppl_idx])
             masked_lm_weights.append(1.0)

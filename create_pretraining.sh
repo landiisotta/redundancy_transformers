@@ -16,13 +16,13 @@ ml python/3.8.2
 source /sc/arion/work/landii03/redundancy_a100/bin/activate
 unset PYTHONPATH
 
-#WS_REDUNDANCY=00
-#DATA_CONFIG=language_model
+WS_REDUNDANCY=00
+DATA_CONFIG=language_model
 # modify this to be the path to the tokenized data, if redundancy point to the root folder (i.e., n2c2_datasets)
 DATA_DIR=n2c2_datasets
 MAX_SEQ_LENGTH=128
-WS_REDUNDANCY=1020
-DATA_CONFIG=${WS_REDUNDANCY}r_language_model
+#WS_REDUNDANCY=15
+#DATA_CONFIG=${WS_REDUNDANCY}r_language_model
 
 OUTPUT_FILE=n2c2datasets_forClinicalBERTfinetuning_maxseqlen$MAX_SEQ_LENGTH$WS_REDUNDANCY.pkl
 # Note that create_pretraining_data.py is unmodified from the script in the original BERT repo.
