@@ -99,7 +99,7 @@ def _read_sentences(sentences, challenge):
         rd = csv.reader(f)
         for r in rd:
             if len(r) > 0 and r[1] == challenge:
-                notes.setdefault(str(r[0]), list()).append(r[-1])
+                notes.setdefault(str(r[0]), list()).append(','.join(r[2:]))
     return notes
 
 

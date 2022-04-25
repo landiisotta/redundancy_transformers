@@ -24,7 +24,7 @@ results
 
 results$tr_redu <- factor(results$tr_redu, levels = c('15', '55', '510', '1010', '1020'))
 results$ts_redu <- factor(results$ts_redu, levels = c('00', '15', '55', '510', '1010', '1020'))
-results$model <- factor(results$model, levels = c('1', '2', '3', '4', '5'))
+results$model <- factor(results$model, levels = c('1', '2', '3', '4', '5', '6'))
 
 results
 
@@ -45,7 +45,7 @@ p +
                             "55" = "5%w 5s", 
                             "15" = "1%w 5s",
                             "510" = "5%w 10s", 
-                            "1020" = "10%w 10s", 
+                            "1010" = "10%w 10s", 
                             "1020" = "10%w 20s")) +
   theme(text = element_text(size=12),
         axis.text.x = element_text(angle=45, hjust=1)) +
@@ -58,9 +58,9 @@ p +
 ppl15 <- results[tr_redu=='15']$relative_ppl
 ppl55 <- results[tr_redu=='55']$relative_ppl
 ppl510 <- results[tr_redu=='510']$relative_ppl
-ppl1020 <- results[tr_redu=='1010']$relative_ppl
+ppl1010 <- results[tr_redu=='1010']$relative_ppl
 ppl1020 <- results[tr_redu=='1020']$relative_ppl
-x <- c(1:4)
+x <- c(1:6)
 
 m1 <- summary(lm(ppl15 ~ x))
 m2 <- summary(lm(ppl55 ~ x))

@@ -87,13 +87,16 @@ def _create_overlap_with_padding(tkn_note, max_seq_len, window_size):
     """
     if len(tkn_note) < max_seq_len:
         return [tkn_note + ["[PAD]"] * (max_seq_len - len(tkn_note))]
-    if window_size:
+    if window_size >= 0:
         ovrlp = []
-        for i in range(0, len(tkn_note) - max_seq_len, window_size):
+        i = 0
+        for i in range(0, len(tkn_note) - max_seq_len, max_seq_len - window_size):
             ovrlp.append(tkn_note[i:i + max_seq_len])
-        while i < len(tkn_note) - window_size:
-            ovrlp.append(tkn_note[i + window_size:] + ["[PAD]"] * (max_seq_len - len(tkn_note[i + window_size:])))
-            i += window_size
+        i += max_seq_len
+        while i < len(tkn_note):
+            ovrlp.append(tkn_note[i - window_size:] + ["[PAD]"] * (max_seq_len - len(tkn_note[i - window_size:])))
+            i += max_seq_len
+    # case window size = -1
     else:
         ovrlp = [tkn_note[:max_seq_len]]
     return ovrlp

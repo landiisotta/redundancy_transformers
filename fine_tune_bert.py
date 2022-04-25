@@ -67,6 +67,7 @@ def run_finetuning(checkpoint,
     data, tokenizer = pkl.load(open(data_path + f'{ws_redundancy_train}.pkl', 'rb'))
     # Load pretrained model
     model = BertForPreTraining.from_pretrained(checkpoint)
+    print("Updating Bert with new vocabulary (if extended medical Bert is available)")
     model.resize_token_embeddings(len(tokenizer['train']))
 
     train, tkn_train = data['train'], tokenizer['train']
@@ -79,7 +80,6 @@ def run_finetuning(checkpoint,
     train_loader = DataLoader(train,
                               batch_size=batch_size,
                               shuffle=True)
-
     if dev:
         val = data['test']
         val.set_format(type='torch',
@@ -94,7 +94,7 @@ def run_finetuning(checkpoint,
     else:
         val_loader = None
 
-    num_training_steps = len(train_loader.sampler) * n_epochs
+    num_training_steps = len(train_loader) * n_epochs
     print(f"Number of training steps: {num_training_steps}")
     warmup_steps = round(num_training_steps / 100)
     # warmup_steps = 0
@@ -173,7 +173,7 @@ if __name__ == '__main__':
         f = open('experiments.txt', 'a')
     else:
         f = open('experiments.txt', 'a')
-        f.write(','.join(['tr_thrs', 'ts_thrs', 'ppl']))
+        f.write(','.join(['tr_thrs', 'ts_thrs', 'epochs', 'ppl']))
         f.write('\n')
     eval_metrics = run_finetuning(checkpoint=config.checkpoint,
                                   data_path=config.data_path,
@@ -186,6 +186,7 @@ if __name__ == '__main__':
                                   ws_redundancy_test=config.ws_redundancy_test)
     f.write(','.join([str(config.ws_redundancy_train),
                       str(config.ws_redundancy_test),
+                      str(config.epochs),
                       str(eval_metrics['ppl'])]))
     f.write('\n')
     f.close()

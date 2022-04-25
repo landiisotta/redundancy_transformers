@@ -55,7 +55,7 @@ def def_tokens(doc):
     :rtype: spacy.tokens.doc.Doc
     """
     patterns = [r'\[\*\*.+?\*\*\]',  # de-identification
-                r'[0-9]{1,4}[/\-][0-9]{1,2}[/\-]*[0-9]*',  # date
+                r'[0-9]{1,4}[/\-]([0-9]{1,2}|[a-zA-Z]{3})[/\-]*[0-9]*$',  # date
                 r'[0-9]+\-?[0-9]+%?',  # lab/test result
                 r'[0-9]+/[0-9]+',  # lab/test result
                 r'[0-9]{1,2}\.[0-9]{1,2}',  # lab/test result
@@ -64,7 +64,7 @@ def def_tokens(doc):
                 r'[A-Za-z]{1,3}\.',  # abbrv, e.g., pt.
                 r'[A-Za-z]\.([A-Za-z]\.){1,2}',  # abbrv, e.g., p.o., b.i.d.
                 r'[0-9]{1,2}h\.',  # time, e.g., 12h
-                r'(\+[0-9] )?\(?[0-9]{3}\)?[\- ][0-9]{3}[\- ][0-9]{4}',  # phone number
+                r'(\+[0-9] ?)?\(?[0-9]{3}\)?[\- ][0-9]{2,4}[\- ][0-9]{2,4}(-[0-9]{1})?', # phone number and discharge order
                 r'[0-9]{1,2}\.',  # Numbered lists
                 r'[0-9]+:[0-9]+:*[0-9]*( AM| PM)*',  # times
                 r'([A-Za-z0-9]+\-)+[A-Za-z0-9]+',  # dashed words
@@ -144,13 +144,13 @@ if __name__ == '__main__':
                 tkn = []
                 for t in s:
                     if t.is_alpha and not t._.is_list and t.pos_ != 'PROPN' and len(t.lemma_) > 1:
-                        if re.match(r'[0-9]{1,4}[/\-][0-9]{1,2}[/\-]*[0-9]*$', t.text):
+                        if re.match(r'[0-9]{1,4}[/\-]([0-9]{1,2}|[a-zA-Z]{3})[/\-]*[0-9]*$', t.text):
                             tkn.append('[DATE]')
                         elif re.match(r'[0-9]+:[0-9]+:*[0-9]*( AM| PM)*', t.text):
                             tkn.append('[TIME]')
                         elif re.match(r'\[\*\*.+?\*\*\]', t.text):
                             continue
-                        elif re.match(r'(\+[0-9] )?\(?[0-9]{3}\)?[\- ][0-9]{3}[\- ][0-9]{4}', t.text):
+                        elif re.match(r'(\+[0-9] ?)?\(?[0-9]{3}\)?[\- ][0-9]{2,4}[\- ][0-9]{2,4}(-[0-9])?', t.text):
                             continue
                         elif re.match(r'[0-9]{4}[0-9]+', t.text):
                             continue

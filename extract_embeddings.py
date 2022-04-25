@@ -5,10 +5,14 @@ import torch
 import time
 from tqdm import tqdm
 
+ws_model = '00'
+ws_test = '510'
+
 DEVICE = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
 PROGRESS_BAR = tqdm()
 
-dt, tkn = pkl.load(open('./datasets/n2c2_datasets/n2c2datasets_forClinicalBERTfinetuning_maxseqlen12800.pkl', 'rb'))
+dt, tkn = pkl.load(open(f'./datasets/n2c2_datasets/n2c2datasets_forClinicalBERTfinetuning_maxseqlen128{ws_test}.pkl',
+                        'rb'))
 with open('./datasets/n2c2_datasets/test_newk_to_oldk.csv', 'r') as f:
     ch_dict = {}
     next(f)
@@ -26,11 +30,11 @@ test.set_format(type='torch',
 test_loader = DataLoader(test, shuffle=False, batch_size=8)
 len_loader = len(test_loader)
 
-model = BertForPreTraining.from_pretrained('./runs/BERT-fine-tuning/redu00tr00ts', from_tf=False)
+model = BertForPreTraining.from_pretrained(f'./runs/BERT-fine-tuning/redu{ws_model}tr{ws_model}ts', from_tf=False)
 model.to(DEVICE)
 model.eval()
 
-embeddings_4layers = torch.tensor([]).to(DEVICE)
+# embeddings_4layers = torch.tensor([]).to(DEVICE)
 embeddings_2ndtolast = torch.tensor([]).to(DEVICE)
 note_ids = []
 # i = 0
@@ -42,9 +46,9 @@ for idx, batch in tqdm(enumerate(test_loader), total=len(test_loader)):
     with torch.no_grad():
         out = model(**batch, output_hidden_states=True)
         # Concat last four hidden layers of [CLS] token and average by note
-        embeddings_4layers = torch.cat([embeddings_4layers,
-                                        torch.concat([out.hidden_states[-j][:, 0] for j in range(-4, 0)], dim=1)],
-                                       dim=0)
+        # embeddings_4layers = torch.cat([embeddings_4layers,
+        #                                 torch.concat([out.hidden_states[-j][:, 0] for j in range(-4, 0)], dim=1)],
+        #                                dim=0)
         # Extract second to last layer
         embeddings_2ndtolast = torch.cat([embeddings_2ndtolast,
                                           out.hidden_states[-2][:, 0]], dim=0)
@@ -54,25 +58,25 @@ for idx, batch in tqdm(enumerate(test_loader), total=len(test_loader)):
 # print(f"Time estimated for model evaluation: {round(time.process_time() - checkpoint) * (len_loader/10)}")
 print(f"Time for model evaluation: {round(time.process_time() - checkpoint)}")
 
-emb_4layers = {}
+# emb_4layers = {}
 emb_2ndtolast = {}
 for idx, k in enumerate(note_ids):
-    emb_4layers.setdefault(k, list()).append(embeddings_4layers[idx])
+    # emb_4layers.setdefault(k, list()).append(embeddings_4layers[idx])
     emb_2ndtolast.setdefault(k, list()).append(embeddings_2ndtolast[idx])
 
-f4 = open('embeddings_4layerconcat.csv', 'w')
-for k, t in emb_4layers.items():
-    if len(t) > 1:
-        tm = torch.mean(torch.cat(t).view(len(t), -1), dim=0)
-    else:
-        tm = t[0]
-    # try:
-    f4.write(','.join([k, ch_dict[k]] + [str(el.item()) for el in tm]) + '\n')
-    # except KeyError:
-    #     f4.write(','.join([k, ''] + [str(el.item()) for el in tm]) + '\n')
-f4.close()
+# f4 = open('embeddings_4layerconcat.csv', 'w')
+# for k, t in emb_4layers.items():
+#     if len(t) > 1:
+#         tm = torch.mean(torch.cat(t).view(len(t), -1), dim=0)
+#     else:
+#         tm = t[0]
+#     # try:
+#     f4.write(','.join([k, ch_dict[k]] + [str(el.item()) for el in tm]) + '\n')
+#     # except KeyError:
+#     #     f4.write(','.join([k, ''] + [str(el.item()) for el in tm]) + '\n')
+# f4.close()
 
-f2 = open('embeddings_2tolast.csv', 'w')
+f2 = open(f'embeddings_2tolast_{ws_model}tr{ws_test}ts.csv', 'w')
 for k, t in emb_2ndtolast.items():
     if len(t) > 1:
         tm = torch.mean(torch.cat(t).view(len(t), -1), dim=0)

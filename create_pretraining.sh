@@ -4,7 +4,7 @@
 #BSUB -q express
 #BSUB -n 64
 #BSUB -W 12:00
-#BSUB -R rusage[mem=4000]
+#BSUB -R rusage[mem=8000]
 #BSUB -R span[ptile=4]
 #BSUB -o %J.stdout
 #BSUB -eo %J.stderr

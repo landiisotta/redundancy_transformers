@@ -61,7 +61,7 @@ if __name__ == '__main__':
     lines = filter(None, (line.rstrip() for line in f))
     for line in lines:
         el = line.rstrip('\n').rsplit(',')
-        notes.setdefault((el[0], el[1]), list()).append(el[2])
+        notes.setdefault((el[0], el[1]), list()).append(','.join(el[2:]))
     f.close()
 
     # Read vocabularies
@@ -74,6 +74,9 @@ if __name__ == '__main__':
     f_sen_to_idx.close()
 
     weights = create_weights(notes, w_to_idx)
+    weights_meta = [['token', 'weight']]
+    for k, val in weights.items():
+        weights_meta.append([k, val])
     syn_notes, wrpl_meta, rp_meta, adds_meta = create_synthetic_corpus(notes,
                                                                        w_to_idx,
                                                                        sen_to_idx,
@@ -86,6 +89,7 @@ if __name__ == '__main__':
     _save_meta(wrpl_meta, 'wordrpl', folder=f'{config.wr_percentage}{config.nsents}', train=config.train)
     _save_meta(rp_meta, 'repbound', folder=f'{config.wr_percentage}{config.nsents}', train=config.train)
     _save_meta(adds_meta, 'addsen', folder=f'{config.wr_percentage}{config.nsents}', train=config.train)
+    _save_meta(weights_meta, 'weightedwords', folder=f'{config.wr_percentage}{config.nsents}', train=config.train)
 
     if config.train:
         f = open(f'./{config.wr_percentage}{config.nsents}/train_sentences.txt', 'w')

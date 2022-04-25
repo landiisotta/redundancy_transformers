@@ -116,7 +116,10 @@ def train_and_eval(train_dataloader,
         print(f"Loss at early stopped epoch {epoch_chkpt}: {loss}")
 
     # torch.save(model.state_dict(), f'{best_model_dir}/best_model.pt')
-    model.module.save_pretrained(best_model_dir)
+    if GPUS == 1:
+        model.save_pretrained(best_model_dir)
+    elif GPUS > 1:
+        model.module.save_pretrained(best_model_dir)
 
     writer_train.close()
     writer_val.close()

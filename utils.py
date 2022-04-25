@@ -1,3 +1,6 @@
+import csv
+import re
+
 # n2c2 challenge datasets folder names
 chll = ['smoking',
         'obesity',
@@ -8,7 +11,7 @@ chll = ['smoking',
         'med_extraction_tsk2']
 
 FOLDER = {'language_model': './datasets/n2c2_datasets',
-           'smoking_challenge': './datasets/2006_smoking_status'}
+          'smoking_challenge': './datasets/2006_smoking_status'}
 
 # Folders where files are stores. Sub folder and file names were preserved.
 # Main folder names were changed
@@ -36,3 +39,37 @@ test_files = {'smoking': '/2006_smoking_status',
 # Pre-trained checkpoint
 checkpoint = "./models/pretrained_tokenizer/clinicalBERT"
 checkpointmod = "./models/pretrained_tokenizer/clinicalBERTmod"
+
+
+def extract_words_to_add():
+    """
+    Function that enriches the BERT vocabulary with words selected for the synthetic simulations
+    and special numeric tokens from the notes
+    :return: set of tokens to add to the Bert vocabulary
+    """
+    # Words used for synthetic replacement
+    fullw_set = set()
+    with open('./datasets/n2c2_datasets/synthetic_n2c2_datasets/test_w_to_idx.txt') as f:
+        rd = csv.reader(f)
+        for r in rd:
+            fullw_set.add(r[0])
+    with open('./datasets/n2c2_datasets/synthetic_n2c2_datasets/train_w_to_idx.txt') as f:
+        rd = csv.reader(f)
+        for r in rd:
+            if r[0] not in fullw_set:
+                fullw_set.add(r[0])
+    # Build clinical notes vocabulary of "special characters"
+    special_set = set()
+    with open('./datasets/n2c2_datasets/train_sentences.txt') as f:
+        rd = csv.reader(f)
+        for r in rd:
+            tkns = r[-1].split(' ')
+            special_set.update(tkns)
+    with open('./datasets/n2c2_datasets/test_sentences.txt') as f:
+        rd = csv.reader(f)
+        for r in rd:
+            tkns = r[-1].split(' ')
+            special_set.update(tkns)
+    notes_vocab = set([w for w in special_set if re.match(r'[0-9]+', w)])
+    add_tokens = fullw_set.union(notes_vocab)
+    return add_tokens

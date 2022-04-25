@@ -192,7 +192,7 @@ class N2c2Dataset(datasets.GeneratorBasedBuilder):
                 if self.config.name == 'language_model' or re.search('r_language_model', self.config.name):
                     if len(row) > 0:
                         yield id_, {
-                            "sentence": row[-1],
+                            "sentence": ','.join(row[2:]),
                             "document": str(row[0]),
                             "challenge": str(row[1]),
                         }
@@ -201,7 +201,7 @@ class N2c2Dataset(datasets.GeneratorBasedBuilder):
                 elif self.config.name == "smoking_challenge" or re.search('r_smoking_challenge', self.config.name):
                     if len(row) > 0:
                         yield id_, {
-                            "note": row[-1],
+                            "note": re.sub('\n', ' ', ','.join(row[2:])),
                             "id": str(row[0]),
                             "label": _SMOKING_LABELS[str(row[1])]
                         }
@@ -210,7 +210,7 @@ class N2c2Dataset(datasets.GeneratorBasedBuilder):
                     if len(row) > 0:
                         tag_lab = {el.split('::')[0]: el.split('::')[1] for el in row[1:-1]}
                         yield id_, {
-                            "note": row[-1],
+                            "note": re.sub('\n', ' ', ','.join(row[2:])),
                             "id": str(row[0]),
                             "label_MET": tag_lab,
                             "label_NOTMET": tag_lab

@@ -1,11 +1,11 @@
 #!/bin/bash
 #BSUB -J create-finetuning-dataset
-#BSUB -P acc_psychgen
+#BSUB -P acc_mscic1
 #BSUB -q express
 #BSUB -n 8
 #BSUB -W 12:00
 #BSUB -R rusage[mem=2000]
-#BSUB -R span[ptile=4]
+#BSUB -R span[ptile=8]
 #BSUB -o %J.stdout
 ##BSUB -eo %J.stderr
 ##BSUB -L /bin/bash
@@ -17,12 +17,13 @@ source /sc/arion/work/landii03/redundancy_a100/bin/activate
 unset PYTHONPATH
 
 DATASET=n2c2_datasets
-CHALLENGE=1020r_smoking_challenge
-MAX_SEQ_LENGTH=128
-WINDOW_SIZE=50
+CHALLENGE=smoking_challenge
+#CHALLENGE=cohort_selection_challenge
+MAX_SEQ_LENGTH=512
+WINDOW_SIZE=-1
 
 OUTPUT=2006_smoking_status
-
+#OUTPUT=2018_cohort_selection
 SEED=1234
 
 python -m create_finetuning \
@@ -30,6 +31,6 @@ python -m create_finetuning \
   --config_challenge=$CHALLENGE \
   --output=$OUTPUT \
   --max_seq_length=$MAX_SEQ_LENGTH \
-  --create_val=0.50 \
+  --create_val=0.25 \
   --random_seed=$SEED \
   --window_size=$WINDOW_SIZE

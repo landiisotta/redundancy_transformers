@@ -10,7 +10,7 @@ import sys
 import os
 from tqdm import tqdm
 import time
-
+import re
 
 MaskedLmInstance = namedtuple("MaskedLmInstance",
                               ["index", "label"])
@@ -50,7 +50,10 @@ class TrainingInstance(object):
         return self.__str__()
 
 
-def create_training_instances(input_dataset, tokenizer, max_seq_length,
+def create_training_instances(input_dataset,
+                              tokenizer,
+                              tokenizer_old,
+                              max_seq_length,
                               dupe_factor, short_seq_prob, masked_lm_prob,
                               max_predictions_per_seq, rng):
     """Create `TrainingInstance`s from Dataset object."""
@@ -60,7 +63,13 @@ def create_training_instances(input_dataset, tokenizer, max_seq_length,
     # Iterate over Dataset objects
     for el in input_dataset:
         if el['sentence']:
-            documents.setdefault(el['document'], list()).append(tokenizer.tokenize(el['sentence']))
+            if tokenizer_old is not None:
+                print(f"Notes are being tokenized with new tokens, "
+                      f"please consider pretraining BERT model to learn new weights "
+                      f"for the corresponding embeddings.")
+                documents.setdefault(el['document'], list()).append(_tokenize(el['sentence'], tokenizer, tokenizer_old))
+            else:
+                documents.setdefault(el['document'], list()).append(tokenizer.tokenize(el['sentence']))
     instances = []
 
     shuff_keys = rng.sample(list(documents.keys()), k=len(documents))
@@ -73,6 +82,29 @@ def create_training_instances(input_dataset, tokenizer, max_seq_length,
 
     rng.shuffle(instances)
     return instances
+
+
+def _tokenize(sentence, tokenizer_new, tokenizer_old):
+    tokenized = []
+    new_vocab = set(tokenizer_new.vocab).difference(set(tokenizer_old.vocab))
+    for tkn in sentence.split(' '):
+        if tkn in new_vocab:
+            tokenized.append(tkn)
+        else:
+            new_tokenized = tokenizer_new.tokenize(tkn)
+            tmp = [new_tokenized[0]]
+            for t in new_tokenized[1:]:
+                if re.match('#', t):
+                    tmp.append(t)
+                else:
+                    tkn_tmp = '##' + t
+                    if tkn_tmp in tokenizer_old.vocab:
+                        tmp.append(tkn_tmp)
+                    else:
+                        tmp = tokenizer_old.tokenize(tkn)
+                        break
+            tokenized.extend(tmp)
+    return tokenized
 
 
 def create_instances_from_document(
@@ -359,13 +391,15 @@ if __name__ == '__main__':
     start = time.time()
     dt = load_dataset(os.path.join('./datasets', config.dataset_name), name=config.config_dataset)
 
-    if os.path.isdir('./models/pretrained_tokenizer/clinicalBERTmod'):
-        checkpoint = './models/pretrained_tokenizer/clinicalBERTmod'
+    if os.path.isdir('./models/pretrained_tokenizer/clinicalBERTmed'):
+        print("Using tokenizer updated with medical terms")
+        checkpoint = './models/pretrained_tokenizer/clinicalBERTmed'
         tokenizer = AutoTokenizer.from_pretrained(checkpoint)
+        tokenizer_old = AutoTokenizer.from_pretrained(ut.checkpoint)
     else:
+        print("Using original Alsentzer et al. tokenizer")
         tokenizer = AutoTokenizer.from_pretrained(ut.checkpoint)
-        tokenizer.add_tokens(['[DATE]', '[TIME]'], special_tokens=True)
-        tokenizer.save_pretrained('./models/pretrained_tokenizer/clinicalBERTmod')
+        tokenizer_old = None
 
     rng = random.Random(config.random_seed)
     processed_data = {}
@@ -373,6 +407,7 @@ if __name__ == '__main__':
     for split in tqdm(dt.keys(), total=len(dt.keys()), desc="Creating instances"):
         instances = create_training_instances(input_dataset=dt[split],
                                               tokenizer=tokenizer,
+                                              tokenizer_old=tokenizer_old,
                                               max_seq_length=config.max_seq_length,
                                               dupe_factor=config.dupe_factor,
                                               short_seq_prob=config.short_seq_prob,
