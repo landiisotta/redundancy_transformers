@@ -17,13 +17,13 @@ source /sc/arion/work/landii03/redundancy_a100/bin/activate
 unset PYTHONPATH
 
 DATASET=n2c2_datasets
-CHALLENGE=smoking_challenge
-#CHALLENGE=cohort_selection_challenge
+#CHALLENGE=smoking_challenge
+CHALLENGE=cohort_selection_challenge
 MAX_SEQ_LENGTH=512
-WINDOW_SIZE=-1
+WINDOW_SIZE=128
 
-OUTPUT=2006_smoking_status
-#OUTPUT=2018_cohort_selection
+#OUTPUT=2006_smoking_status
+OUTPUT=2018_cohort_selection
 SEED=1234
 
 python -m create_finetuning \

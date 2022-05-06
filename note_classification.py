@@ -246,6 +246,7 @@ if __name__ == '__main__':
     if config.ws_redundancy_train != config.ws_redundancy_test:
         best_model_dir = f'./runs/BERT-task-{config.challenge}/redu' \
                          f'{config.ws_redundancy_train}tr{config.ws_redundancy_train}ts{class_label}_' \
+                         f'maxseqlen{config.max_sequence_length}_' \
                          f'{config.learning_rate}'
 
         if config.challenge == 'smoking_challenge':
@@ -302,9 +303,11 @@ if __name__ == '__main__':
     # For cohort selection, if class label = MET then that is coded as 1, otherwise NOTMET=1
     tensorboard_folder = f'redu{config.ws_redundancy_train}tr{config.ws_redundancy_test}ts{class_label}'
     writer_train = SummaryWriter(
-        f'./runs/BERT-task-{config.challenge}/tensorboard/train/{tensorboard_folder}_{config.learning_rate}')
+        f'./runs/BERT-task-{config.challenge}/tensorboard{config.max_sequence_length}/'
+        f'train/{tensorboard_folder}_{config.learning_rate}')
     writer_val = SummaryWriter(
-        f'./runs/BERT-task-{config.challenge}/tensorboard/validation/{tensorboard_folder}_{config.learning_rate}')
+        f'./runs/BERT-task-{config.challenge}/tensorboard{config.max_sequence_length}/'
+        f'validation/{tensorboard_folder}_{config.learning_rate}')
 
     # Load model (5-class classification for smoking challenge; 13-class multi-label for cohort selection)
     if config.challenge == 'smoking_challenge':
@@ -391,7 +394,8 @@ if __name__ == '__main__':
             # Save checkpoint
             best_model_dir = f'./runs/BERT-task-{config.challenge}/' \
                              f'redu{config.ws_redundancy_train}tr' \
-                             f'{config.ws_redundancy_test}ts{class_label}_{config.learning_rate}'
+                             f'{config.ws_redundancy_test}ts{class_label}_maxseqlen{config.max_sequence_length}_' \
+                             f'{config.learning_rate}'
             os.makedirs(best_model_dir, exist_ok=True)
             if epoch != (config.epochs - 1) and epoch != 0:
                 torch.save({
@@ -411,6 +415,11 @@ if __name__ == '__main__':
     line = ['test'] + fixed_info + ['', '', '']
     test_metrics = metrics.TaskMetrics(challenge=config.challenge)
     true_labels, pred_logits, test_loss = test_task(test_loader, model, config.challenge)
+    best_model_dir = f'./runs/BERT-task-{config.challenge}/' \
+                     f'redu{config.ws_redundancy_train}tr' \
+                     f'{config.ws_redundancy_test}ts{class_label}_maxseqlen{config.max_sequence_length}_' \
+                     f'{config.learning_rate}'
+    pkl.dump(pred_logits, open(os.path.join(best_model_dir, 'pred_logits.pkl'), 'wb'))
     print(f"Test set loss: {test_loss}")
     true, pred = _get_labels(true_labels, pred_logits, config.challenge, config.method, float(config.threshold))
     test_metrics.add_batch(true, pred.tolist())

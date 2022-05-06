@@ -208,9 +208,9 @@ class N2c2Dataset(datasets.GeneratorBasedBuilder):
                 elif self.config.name == "cohort_selection_challenge" or re.search('r_cohort_selection_challenge',
                                                                                    self.config.name):
                     if len(row) > 0:
-                        tag_lab = {el.split('::')[0]: el.split('::')[1] for el in row[1:-1]}
+                        tag_lab = {el.split('::')[0]: el.split('::')[1] for el in row[1:14]}
                         yield id_, {
-                            "note": re.sub('\n', ' ', ','.join(row[2:])),
+                            "note": re.sub('\n', ' ', ','.join(row[14:])),
                             "id": str(row[0]),
                             "label_MET": tag_lab,
                             "label_NOTMET": tag_lab

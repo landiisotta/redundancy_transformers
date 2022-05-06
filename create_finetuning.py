@@ -9,6 +9,7 @@ from collections import OrderedDict
 import time
 from sklearn.model_selection import train_test_split
 import re
+from utils import _tokenize
 
 # Labels for the cohort selection task
 _COHORT_TAGS = ["ABDOMINAL", "ADVANCED-CAD", "ALCOHOL-ABUSE",
@@ -19,6 +20,7 @@ _COHORT_TAGS = ["ABDOMINAL", "ADVANCED-CAD", "ALCOHOL-ABUSE",
 
 def create_note_classification_dataset(dataset,
                                        tokenizer,
+                                       tokenizer_old,
                                        max_seq_length=512,
                                        window_size=0):
     """
@@ -27,6 +29,7 @@ def create_note_classification_dataset(dataset,
     :param dataset: data with specific configuration
     :type dataset: Dataset
     :param tokenizer: tokenizer
+    :param tokenizer_old: old tokenizer if available
     :param max_seq_length: max sequence length for dataset
     :param window_size: window size, the note is
         preprocessed to cover max length with sliding windows, default 0
@@ -36,9 +39,14 @@ def create_note_classification_dataset(dataset,
     """
     features = OrderedDict()
     for el in dataset:
-        ovrlp = _create_overlap_with_padding(tokenizer.tokenize(el['note']),
-                                             max_seq_len=max_seq_length,
-                                             window_size=window_size)
+        if tokenizer_old is not None:
+            ovrlp = _create_overlap_with_padding(_tokenize(el['note'], tokenizer, tokenizer_old),
+                                                 max_seq_len=max_seq_length,
+                                                 window_size=window_size)
+        else:
+            ovrlp = _create_overlap_with_padding(tokenizer.tokenize(el['note']),
+                                                 max_seq_len=max_seq_length,
+                                                 window_size=window_size)
         for seq in ovrlp:
             # if window_size:
             #     input_ids, attention_mask, token_type_ids = [], [], []
@@ -171,7 +179,16 @@ if __name__ == '__main__':
     start = time.process_time()
 
     config = parser.parse_args(sys.argv[1:])
-    tokenizer = AutoTokenizer.from_pretrained(ut.checkpointmod)
+
+    if os.path.isdir('./models/pretrained_tokenizer/clinicalBERTmed'):
+        print("Using tokenizer updated with medical terms")
+        checkpoint = './models/pretrained_tokenizer/clinicalBERTmed'
+        tokenizer = AutoTokenizer.from_pretrained(checkpoint)
+        tokenizer_old = AutoTokenizer.from_pretrained(ut.checkpoint)
+    else:
+        print("Using original Alsentzer et al. tokenizer")
+        tokenizer = AutoTokenizer.from_pretrained(ut.checkpoint)
+        tokenizer_old = None
 
     dt = load_dataset(os.path.join('./datasets', config.dataset), name=config.config_challenge)
     chll_dt = {}
@@ -179,6 +196,7 @@ if __name__ == '__main__':
         for split in dt.keys():
             chll_dt[split] = create_note_classification_dataset(dataset=dt[split],
                                                                 tokenizer=tokenizer,
+                                                                tokenizer_old=tokenizer_old,
                                                                 max_seq_length=config.max_seq_length,
                                                                 window_size=config.window_size)
         if config.create_val:
@@ -202,6 +220,7 @@ if __name__ == '__main__':
                 dt[split] = dt[split].map(_label_dict_to_list)
                 chll_dt[split] = create_note_classification_dataset(dataset=dt[split],
                                                                     tokenizer=tokenizer,
+                                                                    tokenizer_old=tokenizer_old,
                                                                     max_seq_length=config.max_seq_length,
                                                                     window_size=config.window_size)
                 dt[split] = dt[split].rename_column('label', f'label_{label.upper()}')

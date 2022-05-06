@@ -10,7 +10,7 @@ import sys
 import os
 from tqdm import tqdm
 import time
-import re
+from utils import _tokenize
 
 MaskedLmInstance = namedtuple("MaskedLmInstance",
                               ["index", "label"])
@@ -64,9 +64,9 @@ def create_training_instances(input_dataset,
     for el in input_dataset:
         if el['sentence']:
             if tokenizer_old is not None:
-                print(f"Notes are being tokenized with new tokens, "
-                      f"please consider pretraining BERT model to learn new weights "
-                      f"for the corresponding embeddings.")
+                # print(f"Notes are being tokenized with new tokens, "
+                #       f"please consider pretraining BERT model to learn new weights "
+                #       f"for the corresponding embeddings.")
                 documents.setdefault(el['document'], list()).append(_tokenize(el['sentence'], tokenizer, tokenizer_old))
             else:
                 documents.setdefault(el['document'], list()).append(tokenizer.tokenize(el['sentence']))
@@ -82,29 +82,6 @@ def create_training_instances(input_dataset,
 
     rng.shuffle(instances)
     return instances
-
-
-def _tokenize(sentence, tokenizer_new, tokenizer_old):
-    tokenized = []
-    new_vocab = set(tokenizer_new.vocab).difference(set(tokenizer_old.vocab))
-    for tkn in sentence.split(' '):
-        if tkn in new_vocab:
-            tokenized.append(tkn)
-        else:
-            new_tokenized = tokenizer_new.tokenize(tkn)
-            tmp = [new_tokenized[0]]
-            for t in new_tokenized[1:]:
-                if re.match('#', t):
-                    tmp.append(t)
-                else:
-                    tkn_tmp = '##' + t
-                    if tkn_tmp in tokenizer_old.vocab:
-                        tmp.append(tkn_tmp)
-                    else:
-                        tmp = tokenizer_old.tokenize(tkn)
-                        break
-            tokenized.extend(tmp)
-    return tokenized
 
 
 def create_instances_from_document(
@@ -343,7 +320,7 @@ def write_instance_to_example(instances, tokenizer, max_seq_length,
             if idx != 0:
                 features['labels'][-1][idx] = tkn
         features.setdefault('note_id', list()).append(instance.note_id)
-    return Dataset.from_dict(features), tokenizer
+    return Dataset.from_dict(features)
 
 
 if __name__ == '__main__':
@@ -403,7 +380,6 @@ if __name__ == '__main__':
 
     rng = random.Random(config.random_seed)
     processed_data = {}
-    tokenizers = {}
     for split in tqdm(dt.keys(), total=len(dt.keys()), desc="Creating instances"):
         instances = create_training_instances(input_dataset=dt[split],
                                               tokenizer=tokenizer,
@@ -414,8 +390,8 @@ if __name__ == '__main__':
                                               masked_lm_prob=config.masked_lm_prob,
                                               max_predictions_per_seq=config.max_predictions_per_seq,
                                               rng=rng)
-        processed_data[split], tokenizers[split] = write_instance_to_example(instances, tokenizer,
-                                                                             config.max_seq_length,
-                                                                             config.max_predictions_per_seq)
-    pkl.dump((DatasetDict(processed_data), tokenizers), open(os.path.join('./datasets', config.output_file), 'wb'))
+        processed_data[split] = write_instance_to_example(instances, tokenizer,
+                                                          config.max_seq_length,
+                                                          config.max_predictions_per_seq)
+    pkl.dump(DatasetDict(processed_data), open(os.path.join('./datasets', config.output_file), 'wb'))
     print(f"Process ended in {round(time.time() - start, 2)}s")

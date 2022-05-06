@@ -1,6 +1,6 @@
 #!/bin/bash
 #BSUB -J note_tokenization
-#BSUB -P acc_psychgen
+#BSUB -P acc_mscic1
 #BSUB -q express
 #BSUB -n 8
 #BSUB -W 12:00

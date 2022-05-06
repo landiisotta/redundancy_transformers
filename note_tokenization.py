@@ -56,21 +56,22 @@ def def_tokens(doc):
     """
     patterns = [r'\[\*\*.+?\*\*\]',  # de-identification
                 r'[0-9]{1,4}[/\-]([0-9]{1,2}|[a-zA-Z]{3})[/\-]*[0-9]*$',  # date
-                r'[0-9]+\-?[0-9]+%?',  # lab/test result
+                r'[0-9]*\-?[0-9]+%?',  # lab/test result
                 r'[0-9]+/[0-9]+',  # lab/test result
-                r'[0-9]{1,2}\.[0-9]{1,2}',  # lab/test result
+                r'[0-9]{0,2}\.[0-9]{1,2}',  # lab/test result
                 r'([0-9]{1,3} ?, ?[0-9]{3})+',  # number >= 10^3
                 r'[0-9]{1,2}\+',  # lab/test result
                 r'[A-Za-z]{1,3}\.',  # abbrv, e.g., pt.
                 r'[A-Za-z]\.([A-Za-z]\.){1,2}',  # abbrv, e.g., p.o., b.i.d.
                 r'[0-9]{1,2}h\.',  # time, e.g., 12h
-                r'(\+[0-9] ?)?\(?[0-9]{3}\)?[\- ][0-9]{2,4}[\- ][0-9]{2,4}(-[0-9]{1})?', # phone number and discharge order
+                r'(\+[0-9] ?)?\(?[0-9]{3}\)?[\- ][0-9]{2,4}[\- ][0-9]{2,4}(-[0-9]{1})?',
+                # phone number and discharge order
                 r'[0-9]{1,2}\.',  # Numbered lists
-                r'[0-9]+:[0-9]+:*[0-9]*( AM| PM)*',  # times
+                r'([0-9]{1,2}:*[0-9]{0,2}:*[0-9]{0,2}( AM| PM)|[0-9]{1,2}:[0-9]{2}$)',  # times
                 r'([A-Za-z0-9]+\-)+[A-Za-z0-9]+',  # dashed words
                 r'[0-9]+s',  # decades
                 r'q\.[0-9]h',  # every x hours
-                r'[0-9]{1,3}-*[0-9]* (mg|cc)',
+                r'[0-9]{1,3}[-\.]*[0-9]* *(mg|cc|MG|CC)',
                 # r'[A-Za-z0-9]+'  # Chemical bounds
                 ]
     for expression in patterns:
@@ -143,10 +144,11 @@ if __name__ == '__main__':
             for s in n[-1].sents:
                 tkn = []
                 for t in s:
-                    if t.is_alpha and not t._.is_list and t.pos_ != 'PROPN' and len(t.lemma_) > 1:
-                        if re.match(r'[0-9]{1,4}[/\-]([0-9]{1,2}|[a-zA-Z]{3})[/\-]*[0-9]*$', t.text):
+                    if not t._.is_list and len(t.lemma_) > 1:
+                        if re.match(r'([0-9]{1,2}|[0-9]{4})[\/\-]([0-9]{1,2}|[a-zA-Z]{3})[\/\-]([0-9]{1,2}|[0-9]{4})$',
+                                    t.text):
                             tkn.append('[DATE]')
-                        elif re.match(r'[0-9]+:[0-9]+:*[0-9]*( AM| PM)*', t.text):
+                        elif re.match(r'([0-9]{1,2}:*[0-9]{0,2}:*[0-9]{0,2}( AM| PM)|[0-9]{1,2}:[0-9]{2}$)', t.text):
                             tkn.append('[TIME]')
                         elif re.match(r'\[\*\*.+?\*\*\]', t.text):
                             continue
@@ -154,8 +156,10 @@ if __name__ == '__main__':
                             continue
                         elif re.match(r'[0-9]{4}[0-9]+', t.text):
                             continue
+                        elif not t.is_alpha:
+                            continue
                         else:
-                            tkn.append(re.sub(' ', '', t.lemma_.strip('.')))
+                            tkn.append(re.sub(' ', '', t.text.strip('.')))
                 if len(tkn) > 0:
                     f.write(','.join(n[:2]) + ',' + ' '.join(tkn).strip(' '))
                     f.write('\n')
