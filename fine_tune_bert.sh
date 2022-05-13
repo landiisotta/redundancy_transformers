@@ -18,7 +18,7 @@ ml python/3.8.2
 source /sc/arion/work/landii03/redundancy_a100/bin/activate
 unset PYTHONPATH
 
-MAX_SEQ_LENGTH=512
+MAX_SEQ_LENGTH=1024
 WS_REDUNDANCY_TRAIN=00
 WS_REDUNDANCY_TEST=00
 # The data path should correspond to the selected thresholds for the training set
@@ -26,9 +26,9 @@ DATA_PATH=./datasets/n2c2_datasets
 FILE_NAME=n2c2datasets_forClinicalBERTfinetuning_maxseqlen$MAX_SEQ_LENGTH
 CHECKPOINT=./models/pretrained_model/clinicalBERT/
 
-EPOCHS=51
+EPOCHS=100
 BATCH_SIZE=32
-LEARNING_RATE=5e-5
+LEARNING_RATE=1e-4
 
 python -m fine_tune_bert \
   --checkpoint=$CHECKPOINT \
@@ -36,7 +36,7 @@ python -m fine_tune_bert \
   --epochs=$EPOCHS \
   --batch_size=$BATCH_SIZE \
   --learning_rate=$LEARNING_RATE \
-  --patience=100 \
+  --patience=200 \
   --dev \
   --ws_redundancy_train=$WS_REDUNDANCY_TRAIN \
   --ws_redundancy_test=$WS_REDUNDANCY_TEST

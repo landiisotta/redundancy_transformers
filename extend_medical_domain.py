@@ -74,6 +74,7 @@ with open('./models/pretrained_tokenizer/clinicalBERTmed/vocab.txt', 'a') as f:
     for w in sorted_tokens.keys():
         f.writelines(w + '\n')
 # Save new vocabulary to file
+print("Saving new words to file...")
 with open('./models/pretrained_tokenizer/clinicalBERTmed/new_vocab_list.txt', 'w') as f:
     for w in sorted_tokens.keys():
         f.writelines(w + '\n')

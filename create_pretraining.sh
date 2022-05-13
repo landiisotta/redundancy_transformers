@@ -20,7 +20,7 @@ WS_REDUNDANCY=00
 DATA_CONFIG=language_model
 # modify this to be the path to the tokenized data, if redundancy point to the root folder (i.e., n2c2_datasets)
 DATA_DIR=n2c2_datasets
-MAX_SEQ_LENGTH=512
+MAX_SEQ_LENGTH=1024
 #WS_REDUNDANCY=15
 #DATA_CONFIG=${WS_REDUNDANCY}r_language_model
 

@@ -18,6 +18,7 @@ unset PYTHONPATH
 
 INPUT_DIR=./datasets/n2c2_datasets
 OUTPUT_DIR=$INPUT_DIR
+
 INPUT_FILE_TRAIN=train_n2c2_datasets.txt
 OUTPUT_FILE_TRAIN=train_sentences.txt
 KEY_FILE=train_newk_to_oldk.csv

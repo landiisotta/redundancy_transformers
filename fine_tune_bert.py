@@ -45,8 +45,8 @@ def run_finetuning(checkpoint,
 
     if os.path.isdir('./models/pretrained_tokenizer/clinicalBERTmed'):
         print("Using tokenizer updated with medical terms")
-        checkpoint = './models/pretrained_tokenizer/clinicalBERTmed'
-        tokenizer = AutoTokenizer.from_pretrained(checkpoint)
+        tokenizer_path = './models/pretrained_tokenizer/clinicalBERTmed'
+        tokenizer = AutoTokenizer.from_pretrained(tokenizer_path)
     else:
         print("Using original Alsentzer et al. tokenizer")
         tokenizer = AutoTokenizer.from_pretrained(ut.checkpoint)
