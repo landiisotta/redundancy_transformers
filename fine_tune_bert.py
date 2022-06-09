@@ -85,7 +85,7 @@ def run_finetuning(checkpoint,
     train.set_format(type='torch',
                      columns=['input_ids',
                               'attention_mask',
-                              'token_type_ids',
+                              'token_types_ids',
                               'next_sentence_label',
                               'labels'])
     train_loader = DataLoader(train,

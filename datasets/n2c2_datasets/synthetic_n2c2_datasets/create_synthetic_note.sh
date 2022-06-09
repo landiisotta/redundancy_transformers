@@ -10,29 +10,35 @@
 ##BSUB -eo %J.stderr
 ##BSUB -L /bin/bash
 
-for w in {1,5,10}
+for w in {0,1}
 do
-#  s=$w
-  if [ $w == 1 ]
-  then
-    s=5
-  fi
-  if [ $w == 5 ]
-  then
-    s=10
-  fi
-  if [ $w == 10 ]
-  then
-    s=20
-  fi
-  # This is creating synthetic notes with s new sentences and w% word replacement
-  python create_synthetic_note.py \
-    --wr_percentage=$w \
-    --nsents=$s \
-    --train
+  if [ $w == 0 ]
+    then
+      for s in {5,10,20}
+      do
+        python create_synthetic_note.py \
+          --wr_percentage=$w \
+          --nsents=$s \
+          --train
 
-  python create_synthetic_note.py \
-    --wr_percentage=$w \
-    --nsents=$s \
-    --no-train
+        python create_synthetic_note.py \
+          --wr_percentage=$w \
+          --nsents=$s \
+          --no-train
+      done
+  else
+    for s in {0,10,20}
+    do
+      # This is creating synthetic notes with s new sentences and w% word replacement
+      python create_synthetic_note.py \
+        --wr_percentage=$w \
+        --nsents=$s \
+        --train
+
+      python create_synthetic_note.py \
+        --wr_percentage=$w \
+        --nsents=$s \
+        --no-train
+    done
+  fi
 done
