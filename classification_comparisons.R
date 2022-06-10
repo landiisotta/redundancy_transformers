@@ -2,7 +2,7 @@ require(data.table)
 require(gridExtra)
 
 # Smoking challenge
-smk <- fread('warmup100_experiments_smoking_challenge.csv',
+smk <- fread('experiments_smoking_challenge.csv',
              colClasses = c(ws_training="character", 
                             ws_test="character"))
 smk_test <- smk[fold=='test']
